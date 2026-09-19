@@ -1,8 +1,15 @@
+"use client";
+
 import Link from "next/link";
 import { GitFork, ExternalLink } from "lucide-react";
+import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 export function AppHeader() {
+  const pathname = usePathname();
+
+  if (pathname === "/") return null;
+
   return (
     <header className="sticky top-0 z-50 w-full border-b border-[#273449] bg-[#090D18]/95 backdrop-blur">
       <div className="max-w-[1280px] mx-auto flex items-center justify-between px-4 sm:px-6 py-3 gap-4">

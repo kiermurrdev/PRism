@@ -1,43 +1,44 @@
-const steps = [
+"use client";
+
+import SectionHead from "./SectionHead";
+import { useReveal } from "@/hooks/useLanding";
+
+const STEPS = [
   {
-    number: "1",
-    title: "Paste a PR",
-    description: "Share a GitHub pull request URL",
+    n: "01",
+    title: "Paste a pull request",
+    body: "PRism reads the diff and makes a shallow clone of the repository.",
   },
   {
-    number: "2",
-    title: "PRism maps its impact",
-    description: "We analyze the architectural impact",
+    n: "02",
+    title: "PRism traces the callers",
+    body: "It pulls the changed function, class and export names out of the diff, searches the working copy for each one, and subtracts the files the pull request already touches. What's left references your change and wasn't updated alongside it.",
   },
   {
-    number: "3",
-    title: "Review the visual report",
-    description: "See affected components at a glance",
+    n: "03",
+    title: "Turn impact into a merge checklist",
+    body: "The map comes with a plain-English account of the change and a manual QA checklist to work through before you merge.",
   },
 ];
 
-export function HowItWorks() {
+export default function HowItWorks() {
+  const { ref, inView } = useReveal<HTMLOListElement>();
+
   return (
-    <section aria-label="How PRism works" className="w-full max-w-3xl mx-auto">
-      <h2 className="text-sm font-semibold uppercase tracking-wider text-[#94A3B8] mb-6">
-        How it works
-      </h2>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-        {steps.map((step) => (
-          <div
-            key={step.number}
-            className="rounded-xl border border-[#273449] bg-[#111827] px-5 py-4"
-          >
-            <div className="flex items-center gap-3 mb-2">
-              <span className="flex items-center justify-center w-7 h-7 rounded-full bg-[#182235] text-sm font-semibold text-[#8B5CF6]">
-                {step.number}
-              </span>
-              <h3 className="font-semibold text-[#F8FAFC]">{step.title}</h3>
-            </div>
-            <p className="text-sm text-[#94A3B8]">{step.description}</p>
-          </div>
+    <section className="wrap section" id="how">
+      <SectionHead
+        title="Three steps, about a minute"
+        note="Nothing is installed and nothing is written back to your repository."
+      />
+      <ol className={`steps rv${inView ? " is-in" : ""}`} ref={ref}>
+        {STEPS.map((s) => (
+          <li className="step" key={s.n}>
+            <span className="step-n">{s.n}</span>
+            <h3 className="step-t">{s.title}</h3>
+            <p className="step-b">{s.body}</p>
+          </li>
         ))}
-      </div>
+      </ol>
     </section>
   );
 }
