@@ -1,0 +1,55 @@
+/*
+ * Restyles the @xyflow/react chrome to match docs/FRONTEND_SPEC.md.
+ * Kept in a module rather than globals.css because globals.css is a frozen
+ * contract owned by the foundation issue.
+ */
+
+.canvas :global(.react-flow__controls) {
+  box-shadow: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.canvas :global(.react-flow__controls-button) {
+  background: var(--surface-elevated);
+  border-bottom: 1px solid var(--border);
+  fill: var(--text-muted);
+  width: 26px;
+  height: 26px;
+}
+
+.canvas :global(.react-flow__controls-button:last-child) {
+  border-bottom: none;
+}
+
+.canvas :global(.react-flow__controls-button:hover) {
+  background: var(--surface);
+  fill: var(--text-primary);
+}
+
+.canvas :global(.react-flow__controls-button:focus-visible) {
+  outline: 2px solid var(--accent-cyan);
+  outline-offset: -2px;
+}
+
+.canvas :global(.react-flow__attribution) {
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.canvas :global(.react-flow__attribution a) {
+  color: var(--text-muted);
+}
+
+/* React Flow draws its own focus outline on the node wrapper. */
+.canvas :global(.react-flow__node:focus) {
+  outline: none;
+}
+
+.canvas :global(.react-flow__node:focus-visible) {
+  outline: 2px solid var(--accent-cyan);
+  outline-offset: 3px;
+  border-radius: 12px;
+}
