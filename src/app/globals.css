@@ -1,0 +1,29 @@
+@import "tailwindcss";
+@import "@xyflow/react/dist/style.css";
+
+:root {
+  --background: #090D18;
+  --surface: #111827;
+  --surface-elevated: #182235;
+  --border: #273449;
+  --text-primary: #F8FAFC;
+  --text-muted: #94A3B8;
+  --accent-purple: #8B5CF6;
+  --accent-cyan: #22D3EE;
+  --status-changed: #EAB308;
+  --status-direct: #F97316;
+  --status-possible: #EF4444;
+  --status-unchanged: #64748B;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--text-primary);
+  --font-sans: var(--font-inter);
+}
+
+body {
+  background: var(--background);
+  color: var(--text-primary);
+  font-family: var(--font-inter), system-ui, sans-serif;
+}
