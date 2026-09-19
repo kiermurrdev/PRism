@@ -1,6 +1,7 @@
 import { ReportData } from "@/types/report";
+import { ReportDataSchema } from "@/lib/analysis/schema";
 
-export const mockReport: ReportData = {
+export const mockReport: ReportData = ReportDataSchema.parse({
   title: "Add coupon support to checkout flow",
   prUrl: "https://github.com/example/ecommerce/pull/42",
   summary:
@@ -127,4 +128,4 @@ export const mockReport: ReportData = {
     { path: "migrations/042_create_coupons.sql", status: "added", additions: 31, deletions: 0, changeType: "Create coupons table" },
     { path: "services/order/model.ts", status: "modified", additions: 6, deletions: 1, changeType: "Add coupon reference" },
   ],
-};
+});
