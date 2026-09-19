@@ -9,6 +9,7 @@ import ImpactGraph from "@/components/report/ImpactGraph";
 import ChangeSummaryCard from "@/components/report/ChangeSummaryCard";
 import ImpactFindings from "@/components/report/ImpactFindings";
 import { QAChecklist } from "@/components/report/QAChecklist";
+import AffectedFiles from "@/components/report/AffectedFiles";
 import NodeDetailsPanel from "@/components/report/NodeDetailsPanel";
 import ImpactLegend from "@/components/report/ImpactLegend";
 
@@ -97,16 +98,8 @@ export default function DemoReportPage() {
           <div className="grid gap-6 md:grid-cols-2">
             <QAChecklist items={mockReport.qaItems} />
 
-            {/* Affected files integration point — awaiting issue #9 */}
-            <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6">
-              <h2 className="mb-2 text-lg font-semibold text-[var(--text-primary)]">
-                Affected Files
-              </h2>
-              <p className="text-[var(--text-muted)]">
-                Integration pending — awaiting affected-files component from
-                issue #9.
-              </p>
-            </div>
+            {/* Affected files — issue #9 component */}
+            <AffectedFiles files={mockReport.affectedFiles} />
           </div>
         </div>
       </main>
