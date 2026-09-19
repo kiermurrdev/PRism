@@ -146,10 +146,7 @@ describe("ingestPR", () => {
     let filesRequested = 0;
 
     global.fetch = mock.fn(
-      (
-        input: URL | RequestInfo,
-        _init?: RequestInit
-      ): Promise<Response> => {
+      (input: URL | RequestInfo): Promise<Response> => {
         const u = input.toString();
       if (u.includes("/pulls/1") && !u.includes("/files")) {
         return Promise.resolve(
@@ -246,10 +243,7 @@ describe("truncation behavior", () => {
     const mockTree = { tree: [] };
 
     global.fetch = mock.fn(
-      (
-        input: URL | RequestInfo,
-        _init?: RequestInit
-      ): Promise<Response> => {
+      (input: URL | RequestInfo): Promise<Response> => {
         const u = input.toString();
       if (u.includes("/pulls/1") && !u.includes("/files")) {
         return Promise.resolve(
@@ -326,10 +320,7 @@ describe("truncation behavior", () => {
     let bigPatchFilesRequested = 0;
 
     global.fetch = mock.fn(
-      (
-        input: URL | RequestInfo,
-        _init?: RequestInit
-      ): Promise<Response> => {
+      (input: URL | RequestInfo): Promise<Response> => {
         const u = input.toString();
       if (u.includes("/pulls/1") && !u.includes("/files")) {
         return Promise.resolve(
