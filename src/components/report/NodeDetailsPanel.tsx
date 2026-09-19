@@ -4,7 +4,7 @@ import {
   useCallback,
   useEffect,
   useRef,
-  useState,
+  useSyncExternalStore,
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
 import { createPortal } from "react-dom";
@@ -49,6 +49,9 @@ const KIND_LABEL: Record<NodeKind, string> = {
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
+/** Never fires. `mounted` only has to flip once, at hydration. */
+const subscribeNever = () => () => {};
+
 export default function NodeDetailsPanel({
   node,
   open,
@@ -58,12 +61,17 @@ export default function NodeDetailsPanel({
   // regardless of what `open` says.
   const isOpen = open && node !== null;
 
-  const [mounted, setMounted] = useState(false);
+  // False on the server, true on the client, so `createPortal` never runs
+  // during SSR. No state, so no setState inside an effect.
+  const mounted = useSyncExternalStore(
+    subscribeNever,
+    () => true,
+    () => false,
+  );
+
   const panelRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const previouslyFocused = useRef<HTMLElement | null>(null);
-
-  useEffect(() => setMounted(true), []);
 
   const close = useCallback(() => onOpenChange(false), [onOpenChange]);
 
