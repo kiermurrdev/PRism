@@ -1,91 +1,94 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { ChangeEvent, KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
+import { PR_URL_PATTERN } from "@/lib/landing-data";
+import { useIsMac } from "@/hooks/useLanding";
 
-const EXAMPLE_PR = "https://github.com/example/ecommerce/pull/42";
-
-const GITHUB_PR_REGEX =
-  /^https:\/\/github\.com\/[a-zA-Z0-9_-]+\/[a-zA-Z0-9_.-]+\/pull\/\d+$/;
-
-export function PRInputForm() {
-  const [value, setValue] = useState("");
-  const [error, setError] = useState<string | null>(null);
+/**
+ * Behaviour is preserved from issue #3: a valid URL navigates to
+ * /analyze?pr={encodedUrl}, empty and malformed input show inline
+ * errors, the error clears when the input becomes valid, and Enter
+ * submits. Adds a command-or-control Enter shortcut from anywhere.
+ */
+export default function PRInputForm() {
   const router = useRouter();
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const [value, setValue] = useState("");
+  const [error, setError] = useState("");
+  const mac = useIsMac();
 
-  const validate = useCallback((url: string): string | null => {
-    if (!url.trim()) return "Please enter a PR URL";
-    if (!GITHUB_PR_REGEX.test(url))
-      return "Invalid URL. Use: https://github.com/{owner}/{repo}/pull/{number}";
-    return null;
-  }, []);
-
-  const handleSubmit = useCallback(
-    (e: React.FormEvent) => {
-      e.preventDefault();
-      const validationError = validate(value);
-      if (validationError) return;
-      router.push(`/analyze?pr=${encodeURIComponent(value)}`);
-    },
-    [value, validate, router]
-  );
-
-  const handleExample = useCallback(() => {
-    setValue(EXAMPLE_PR);
-    setError(null);
-    router.push(`/analyze?pr=${encodeURIComponent(EXAMPLE_PR)}`);
-  }, [router]);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setValue(e.target.value);
-    if (error) setError(null);
+  const submit = () => {
+    const v = (inputRef.current?.value ?? value).trim();
+    if (!v) {
+      setError("Paste a pull request URL to start.");
+      return;
+    }
+    if (!PR_URL_PATTERN.test(v)) {
+      setError(
+        "That isn't a GitHub pull request URL. It should look like github.com/owner/repo/pull/123."
+      );
+      return;
+    }
+    setError("");
+    router.push(`/analyze?pr=${encodeURIComponent(v)}`);
   };
 
+  useEffect(() => {
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key !== "Enter") return;
+      if (mac ? !e.metaKey : !e.ctrlKey) return;
+      e.preventDefault();
+      inputRef.current?.focus();
+      if (inputRef.current?.value.trim()) submit();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mac]);
+
   return (
-    <div className="w-full max-w-xl mx-auto">
-      <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3">
-        <label htmlFor="pr-url" className="sr-only">
-          GitHub PR URL
+    <div className="form rise" data-r="3">
+      <div className={`field-box${error ? " is-bad" : ""}`}>
+        <span className="field-glyph" aria-hidden="true">
+          &#8599;
+        </span>
+        <label className="sr-only" htmlFor="pr">
+          Public GitHub pull request URL
         </label>
         <input
-          id="pr-url"
+          id="pr"
+          ref={inputRef}
           type="url"
-          placeholder="https://github.com/owner/repo/pull/123"
+          inputMode="url"
+          spellCheck={false}
+          autoComplete="off"
+          placeholder="github.com/owner/repo/pull/123"
           value={value}
-          onChange={handleChange}
-          className="flex-1 px-4 py-3 rounded-xl border border-[#273449] bg-[#111827] text-[#F8FAFC] placeholder-[#64748B] focus:outline-none focus:ring-2 focus:ring-[#8B5CF6] focus:border-transparent"
-          aria-invalid={!!error}
-          aria-describedby={error ? "pr-url-error" : undefined}
+          onChange={(e: ChangeEvent<HTMLInputElement>) => {
+            setValue(e.target.value);
+            if (error && PR_URL_PATTERN.test(e.target.value.trim())) setError("");
+          }}
+          onKeyDown={(e: ReactKeyboardEvent<HTMLInputElement>) => {
+            if (e.key === "Enter") submit();
+          }}
         />
-        <button
-          type="submit"
-          className="px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-[#8B5CF6] to-[#22D3EE] hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[#8B5CF6] focus:ring-offset-2 focus:ring-offset-[#090D18] transition-opacity"
-        >
-          Generate impact map
+        <span className="kbd" aria-hidden="true">
+          {mac ? "\u2318 \u23CE" : "Ctrl \u23CE"}
+        </span>
+        <button className="cta" type="button" onClick={submit}>
+          Analyze
         </button>
-      </form>
+      </div>
 
-      {error && (
-        <p
-          id="pr-url-error"
-          role="alert"
-          className="mt-2 text-sm text-[#EF4444]"
-        >
+      <div className="form-foot">
+        <p className="err" role="status">
           {error}
         </p>
-      )}
-
-      <div className="mt-4 flex flex-col sm:flex-row items-start sm:items-center gap-3 text-sm">
-        <button
-          type="button"
-          onClick={handleExample}
-          className="text-[#22D3EE] hover:underline focus:outline-none focus:underline"
-        >
-          Try an example
-        </button>
-        <span className="text-[#64748B]">
-          Prototype supports public repositories only
-        </span>
+        <p className="notice">
+          Public GitHub repository &middot; No installation required
+        </p>
       </div>
     </div>
   );
