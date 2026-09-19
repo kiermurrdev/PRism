@@ -1,4 +1,10 @@
-import { Circle, CircleDot, HelpCircle, type LucideIcon } from "lucide-react";
+import {
+  Circle,
+  CircleDot,
+  FileDiff,
+  HelpCircle,
+  type LucideIcon,
+} from "lucide-react";
 
 import type { ImpactLevel } from "@/types/report";
 
@@ -57,3 +63,32 @@ export const IMPACT_ORDER: readonly ImpactLevel[] = [
 export function impactColor(impact: ImpactLevel): string {
   return `var(${IMPACT_META[impact].cssVar})`;
 }
+
+/**
+ * The legend must explain all four impact tiers from the frontend
+ * specification, including `changed`, which has a `--status-changed` token but
+ * no corresponding value in `ImpactLevel`. This display-only union covers the
+ * gap without editing the frozen shared type.
+ *
+ * `IMPACT_META` above stays keyed to the real `ImpactLevel` so the graph cannot
+ * accidentally render a tier the data layer cannot produce.
+ */
+export type DisplayImpactLevel = ImpactLevel | "changed";
+
+export const DISPLAY_IMPACT_META: Record<DisplayImpactLevel, ImpactMeta> = {
+  changed: {
+    label: "Changed",
+    cssVar: "--status-changed",
+    description: "Modified directly by the diff.",
+    icon: FileDiff,
+  },
+  ...IMPACT_META,
+};
+
+/** Legend display order, most to least certain. */
+export const LEGEND_ORDER: readonly DisplayImpactLevel[] = [
+  "changed",
+  "direct",
+  "possible",
+  "unchanged",
+];
