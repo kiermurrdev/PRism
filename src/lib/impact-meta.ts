@@ -1,0 +1,59 @@
+import { Circle, CircleDot, HelpCircle, type LucideIcon } from "lucide-react";
+
+import type { ImpactLevel } from "@/types/report";
+
+/**
+ * Single source of truth for how each impact level is presented.
+ *
+ * The graph, node details panel, impact legend, and findings list must all read
+ * from here rather than hardcoding strings or colors, so the wording cannot
+ * drift apart between components.
+ *
+ * NOTE: `docs/FRONTEND_SPEC.md` defines a `--status-changed` token, but
+ * `ImpactLevel` in `src/types/report.ts` has no `changed` value, so no entry can
+ * reference it yet. If a `changed` tier is added to the shared type, add the
+ * matching entry here and nothing else needs to change.
+ */
+export interface ImpactMeta {
+  /** User-facing label. Fixed wording — do not paraphrase at call sites. */
+  label: string;
+  /** CSS custom property name from globals.css. */
+  cssVar: string;
+  /** One-line explanation, used in the legend and details panel. */
+  description: string;
+  /** Redundant, non-color encoding of impact, for accessibility. */
+  icon: LucideIcon;
+}
+
+export const IMPACT_META: Record<ImpactLevel, ImpactMeta> = {
+  direct: {
+    label: "Directly affected",
+    cssVar: "--status-direct",
+    description: "Connected to something the diff changed.",
+    icon: CircleDot,
+  },
+  possible: {
+    label: "Possibly affected",
+    cssVar: "--status-possible",
+    description: "May be affected downstream. Unconfirmed.",
+    icon: HelpCircle,
+  },
+  unchanged: {
+    label: "Context",
+    cssVar: "--status-unchanged",
+    description: "Shown for orientation. Believed unaffected.",
+    icon: Circle,
+  },
+};
+
+/** Display order, most to least certain. Use for legends and grouping. */
+export const IMPACT_ORDER: readonly ImpactLevel[] = [
+  "direct",
+  "possible",
+  "unchanged",
+];
+
+/** Resolves an impact level to a CSS `var()` reference. */
+export function impactColor(impact: ImpactLevel): string {
+  return `var(${IMPACT_META[impact].cssVar})`;
+}
