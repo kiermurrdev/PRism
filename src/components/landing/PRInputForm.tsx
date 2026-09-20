@@ -89,6 +89,14 @@ export default function PRInputForm() {
         <p className="notice">
           Public GitHub repository &middot; No installation required
         </p>
+        <p className="notice">
+          <a
+            href="/analyze?pr=https%3A%2F%2Fgithub.com%2Fplausible%2Fanalytics%2Fpull%2F6232"
+            className="text-[#8B5CF6] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8B5CF6] rounded"
+          >
+            Try an example
+          </a>
+        </p>
       </div>
     </div>
   );

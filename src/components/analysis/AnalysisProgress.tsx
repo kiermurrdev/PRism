@@ -2,7 +2,7 @@
 
 import React from "react";
 import { cn } from "@/lib/utils";
-import { CheckCircle2, Loader2 } from "lucide-react";
+import { CheckCircle2, Loader2, AlertCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 const STAGES = [
@@ -12,12 +12,37 @@ const STAGES = [
   "Generating QA checklist",
 ];
 
-export function AnalysisProgress({ prUrl }: { prUrl: string }) {
+type AnalysisState =
+  | { type: "analyzing" }
+  | { type: "success" }
+  | { type: "error"; message: string };
+
+export type { AnalysisState };
+
+interface AnalysisProgressProps {
+  /** The original PR URL used for the demo/example fallback */
+  prUrl: string;
+  /** Current analysis state driven by the caller */
+  state: AnalysisState;
+  /** Called when the user clicks Retry */
+  onRetry?: () => void;
+  /** Called when the user clicks Back */
+  onBack?: () => void;
+}
+
+export function AnalysisProgress({
+  prUrl,
+  state,
+  onRetry,
+  onBack,
+}: AnalysisProgressProps) {
   const router = useRouter();
   const [currentStage, setCurrentStage] = React.useState(0);
   const [completed, setCompleted] = React.useState(false);
 
   React.useEffect(() => {
+    if (state.type !== "analyzing") return;
+
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const stageDuration = reducedMotion ? 400 : 800;
 
@@ -33,25 +58,72 @@ export function AnalysisProgress({ prUrl }: { prUrl: string }) {
     }, stageDuration);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [state.type]);
 
+  // When analysis succeeds, navigate after a brief delay.
   React.useEffect(() => {
-    if (!completed) return;
+    if (state.type !== "success") return;
 
     const timer = setTimeout(() => {
       router.push(`/report/demo?pr=${encodeURIComponent(prUrl)}`);
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [completed, prUrl, router]);
+  }, [state.type, prUrl, router]);
 
   const progressPercent = Math.round(((currentStage + (completed ? 1 : 0)) / STAGES.length) * 100);
+
+  if (state.type === "error") {
+    return (
+      <div className="w-full max-w-xl mx-auto text-center">
+        <div className="mb-6">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[#111827] border border-[#273449] mb-4">
+            <AlertCircle className="w-6 h-6 text-[#EF4444]" aria-hidden="true" />
+          </div>
+          <h2 className="text-lg font-semibold mb-2">Analysis failed</h2>
+          <p className="text-[#94A3B8] text-sm max-w-sm mx-auto">{state.message}</p>
+        </div>
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+          {onRetry && (
+            <button
+              type="button"
+              onClick={onRetry}
+              className={cn(
+                "inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium",
+                "bg-gradient-to-r from-[#8B5CF6] to-[#22D3EE] text-[#090D18]",
+                "hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8B5CF6]",
+                "transition-opacity"
+              )}
+            >
+              <Loader2 className="w-4 h-4" aria-hidden="true" />
+              Retry
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => onBack?.() ?? router.push("/")}
+            className={cn(
+              "inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium",
+              "border border-[#273449] bg-[#111827] text-[#F8FAFC]",
+              "hover:bg-[#182235] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8B5CF6]",
+              "transition-colors"
+            )}
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+              <path d="M19 12H5M12 19l-7-7 7-7" />
+            </svg>
+            Back
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full max-w-xl mx-auto">
       <div className="mb-6">
         <div className="flex items-center justify-between text-sm text-[#94A3B8] mb-2">
-          <span>Analyzing</span>
+          <span>Analysis in progress</span>
           <span>{progressPercent}%</span>
         </div>
         <div className="h-1.5 w-full rounded-full bg-[#111827] overflow-hidden">
