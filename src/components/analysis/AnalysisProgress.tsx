@@ -4,6 +4,7 @@ import React from "react";
 import { cn } from "@/lib/utils";
 import { CheckCircle2, Loader2, AlertCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { ANALYSIS_RESULT_KEY } from "@/lib/analysis/constants";
 
 const STAGES = [
   "Reading pull request",
@@ -60,12 +61,25 @@ export function AnalysisProgress({
     return () => clearInterval(interval);
   }, [state.type]);
 
-  // When analysis succeeds, navigate after a brief delay.
+  // When analysis succeeds, navigate based on whether the result is live or mock.
   React.useEffect(() => {
     if (state.type !== "success") return;
 
     const timer = setTimeout(() => {
-      router.push(`/report/demo?pr=${encodeURIComponent(prUrl)}`);
+      // Check the stored result to decide where to navigate.
+      const stored = sessionStorage.getItem(ANALYSIS_RESULT_KEY);
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          if (parsed?.metadata?.source === "mock") {
+            router.push(`/report/demo?pr=${encodeURIComponent(prUrl)}`);
+            return;
+          }
+        } catch {
+          // fall through to live path on parse error
+        }
+      }
+      router.push("/report");
     }, 300);
 
     return () => clearTimeout(timer);
