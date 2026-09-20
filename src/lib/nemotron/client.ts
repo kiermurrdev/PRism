@@ -2,6 +2,7 @@ import { ReportDataSchema } from "@/lib/analysis/schema";
 import {
   ENV_NEMOTRON_BASE_URL,
   ENV_NEMOTRON_MODEL,
+  ENV_NEMOTRON_TIMEOUT_MS,
   ENV_NVIDIA_API_KEY,
   MAX_REPAIR_ATTEMPTS,
 } from "./constants";
@@ -37,6 +38,17 @@ function validateConfig(): NemotronError | null {
   }
 
   return null;
+}
+
+/**
+ * Reads the optional request timeout from the environment.
+ * Invalid, empty, or non-positive values safely fall back to the default.
+ */
+function configuredTimeoutMs(): number {
+  const configured = Number(process.env[ENV_NEMOTRON_TIMEOUT_MS]);
+  return Number.isFinite(configured) && configured > 0
+    ? configured
+    : DEFAULT_TIMEOUT_MS;
 }
 
 /**
@@ -279,7 +291,7 @@ export async function analyzeWithNemotron(
 
   const baseUrl = process.env[ENV_NEMOTRON_BASE_URL]!;
   const model = process.env[ENV_NEMOTRON_MODEL]!;
-  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const timeoutMs = options.timeoutMs ?? configuredTimeoutMs();
 
   const systemPrompt = buildSystemPrompt();
   const userPrompt = buildUserPrompt(context);

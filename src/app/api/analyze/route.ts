@@ -22,6 +22,9 @@ import { AnalysisRequestSchema, AnalysisResultSchema } from "@/lib/analysis/sche
 import type { AnalysisResult, AnalysisSnapshot } from "@/types/analysis";
 import { withAnalysisGuard, buildCacheKey } from "@/lib/server/analysis-guard";
 
+// Allow the route to run up to Vercel's five-minute function limit.
+export const maxDuration = 300;
+
 /**
  * NDJSON progress event types streamed to the client.
  */
