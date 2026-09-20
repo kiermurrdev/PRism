@@ -1,14 +1,103 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { AnalysisProgress } from "@/components/analysis/AnalysisProgress";
+import { AnalysisProgress, type AnalysisState } from "@/components/analysis/AnalysisProgress";
 import { cn } from "@/lib/utils";
 import { ArrowLeft } from "lucide-react";
+import { ANALYSIS_RESULT_KEY } from "@/lib/analysis/constants";
+import { analyzePr } from "@/lib/analysis/request";
+
+/**
+ * Example PR URL used for the guaranteed mock path.
+ */
+const EXAMPLE_PR_URL = "https://github.com/plausible/analytics/pull/6232";
+
+/**
+ * Parses a GitHub PR URL into { repo, prNumber }.
+ */
+function parsePrUrl(url: string): { repo: string; prNumber: number } | null {
+  const match = url.match(/github\.com\/([\w.-]+\/[\w.-]+)\/pull\/(\d+)/);
+  if (!match) return null;
+  return { repo: match[1], prNumber: parseInt(match[2], 10) };
+}
 
 export function AnalyzeContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const prUrl = searchParams.get("pr");
+
+  const [analysisState, setAnalysisState] = useState<AnalysisState>({
+    type: "analyzing",
+  });
+  const submitting = useRef(false);
+  const didMount = useRef(false);
+
+  const runAnalysis = useCallback(async () => {
+    if (!prUrl || submitting.current) return;
+    submitting.current = true;
+
+    const parsed = parsePrUrl(prUrl);
+    if (!parsed) {
+      setAnalysisState({
+        type: "error",
+        message: "That doesn't look like a GitHub pull request URL.",
+      });
+      submitting.current = false;
+      return;
+    }
+
+    // The example PR is guaranteed to use mock data — no API call.
+    if (prUrl === EXAMPLE_PR_URL) {
+      try {
+        const mockResult = await import("@/data/mock-report").then((m) => m.mockReport);
+        sessionStorage.setItem(
+          ANALYSIS_RESULT_KEY,
+          JSON.stringify({
+            ...mockResult,
+            prUrl,
+            metadata: {
+              source: "mock" as const,
+              analyzedAt: new Date().toISOString(),
+              headSha: "0000000000000000000000000000000000000000",
+            },
+          })
+        );
+        setAnalysisState({ type: "success" });
+      } catch {
+        setAnalysisState({
+          type: "error",
+          message: "Could not load the example. Please try again.",
+        });
+      } finally {
+        submitting.current = false;
+      }
+      return;
+    }
+
+    // Live analysis via the API route.
+    try {
+      const result = await analyzePr(parsed.repo, parsed.prNumber);
+      sessionStorage.setItem(ANALYSIS_RESULT_KEY, JSON.stringify(result));
+      setAnalysisState({ type: "success" });
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Analysis failed. Please try again.";
+      setAnalysisState({ type: "error", message });
+    } finally {
+      submitting.current = false;
+    }
+  }, [prUrl]);
+
+  // Trigger analysis once on mount if a PR URL is present.
+  useEffect(() => {
+    if (!didMount.current && prUrl) {
+      didMount.current = true;
+      runAnalysis();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prUrl]);
 
   if (!prUrl) {
     return (
@@ -47,7 +136,12 @@ export function AnalyzeContent() {
             {prUrl}
           </p>
         </div>
-        <AnalysisProgress prUrl={prUrl} />
+        <AnalysisProgress
+          prUrl={prUrl}
+          state={analysisState}
+          onRetry={runAnalysis}
+          onBack={() => router.push("/")}
+        />
       </main>
     </div>
   );
