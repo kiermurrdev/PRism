@@ -2,6 +2,17 @@ import { strict as assert } from "node:assert";
 import { describe, it, beforeEach, afterEach, mock } from "node:test";
 import type { NextRequest, NextResponse } from "next/server";
 
+/**
+ * Read an NDJSON stream and return parsed lines.
+ */
+async function readNDJSON(res: NextResponse): Promise<unknown[]> {
+  const text = await res.text();
+  return text
+    .split("\n")
+    .filter((l) => l.trim())
+    .map((l) => JSON.parse(l));
+}
+
 describe("POST /api/analyze", () => {
   let originalFetch: typeof global.fetch;
   let POST: (req: NextRequest) => Promise<NextResponse>;
@@ -72,9 +83,12 @@ describe("POST /api/analyze", () => {
       json: () => Promise.resolve({ repo: "owner/repo", prNumber: 999 }),
     } as NextRequest;
     const res = await POST(req);
-    assert.strictEqual(res.status, 404);
-    const body = await res.json();
-    assert.strictEqual(body.code, "PR_NOT_FOUND");
+    // Streaming route returns 200; error is in NDJSON
+    assert.strictEqual(res.status, 200);
+    const lines = await readNDJSON(res);
+    const last = lines[lines.length - 1] as Record<string, unknown>;
+    assert.strictEqual(last.type, "error");
+    assert.strictEqual(last.code, "PR_NOT_FOUND");
   });
 
   it("returns 429 when GitHub rate limits", async () => {
@@ -91,9 +105,11 @@ describe("POST /api/analyze", () => {
       json: () => Promise.resolve({ repo: "owner/repo", prNumber: 1 }),
     } as NextRequest;
     const res = await POST(req);
-    assert.strictEqual(res.status, 429);
-    const body = await res.json();
-    assert.strictEqual(body.code, "RATE_LIMITED");
+    assert.strictEqual(res.status, 200);
+    const lines = await readNDJSON(res);
+    const last = lines[lines.length - 1] as Record<string, unknown>;
+    assert.strictEqual(last.type, "error");
+    assert.strictEqual(last.code, "RATE_LIMITED");
   });
 
   it("returns 503 when Nemotron is misconfigured", async () => {
@@ -150,9 +166,11 @@ describe("POST /api/analyze", () => {
       json: () => Promise.resolve({ repo: "owner/repo", prNumber: 1 }),
     } as NextRequest;
     const res = await POST(req);
-    assert.strictEqual(res.status, 503);
-    const body = await res.json();
-    assert.strictEqual(body.code, "MISSING_CONFIG");
+    assert.strictEqual(res.status, 200);
+    const lines = await readNDJSON(res);
+    const last = lines[lines.length - 1] as Record<string, unknown>;
+    assert.strictEqual(last.type, "error");
+    assert.strictEqual(last.code, "MISSING_CONFIG");
   });
 
   it("returns 504 when Nemotron times out", async () => {
@@ -215,9 +233,11 @@ describe("POST /api/analyze", () => {
       json: () => Promise.resolve({ repo: "owner/repo", prNumber: 1 }),
     } as NextRequest;
     const res = await POST(req);
-    assert.strictEqual(res.status, 504);
-    const body = await res.json();
-    assert.strictEqual(body.code, "TIMEOUT");
+    assert.strictEqual(res.status, 200);
+    const lines = await readNDJSON(res);
+    const last = lines[lines.length - 1] as Record<string, unknown>;
+    assert.strictEqual(last.type, "error");
+    assert.strictEqual(last.code, "TIMEOUT");
   });
 
   it("returns 200 with valid report on success", async () => {
@@ -323,15 +343,24 @@ describe("POST /api/analyze", () => {
     } as NextRequest;
     const res = await POST(req);
     assert.strictEqual(res.status, 200);
-    const body = await res.json();
-    assert.strictEqual(body.title, "Test PR");
-    assert.strictEqual(body.prUrl, "https://github.com/owner/repo/pull/1");
-    assert.ok(body.metadata);
-    assert.strictEqual(body.metadata.source, "live");
-    assert.strictEqual(body.metadata.headSha, "abc123");
-    assert.strictEqual(body.nodes[0].id, "test-node");
-    assert.strictEqual(body.affectedFiles[0].path, "src/test.ts");
-    assert.strictEqual(body.affectedFiles[0].additions, 10);
-    assert.strictEqual(body.affectedFiles[0].deletions, 2);
+    const lines = await readNDJSON(res);
+    const last = lines[lines.length - 1] as Record<string, unknown>;
+    assert.strictEqual(last.type, "complete");
+    const data = last.data as Record<string, unknown> & {
+      title: string;
+      prUrl: string;
+      metadata: { source: string; headSha: string };
+      nodes: Array<Record<string, unknown>>;
+      affectedFiles: Array<Record<string, unknown>>;
+    };
+    assert.strictEqual(data.title, "Test PR");
+    assert.strictEqual(data.prUrl, "https://github.com/owner/repo/pull/1");
+    assert.ok(data.metadata);
+    assert.strictEqual(data.metadata.source, "live");
+    assert.strictEqual(data.metadata.headSha, "abc123");
+    assert.strictEqual(data.nodes[0].id, "test-node");
+    assert.strictEqual(data.affectedFiles[0].path, "src/test.ts");
+    assert.strictEqual(data.affectedFiles[0].additions, 10);
+    assert.strictEqual(data.affectedFiles[0].deletions, 2);
   });
 });

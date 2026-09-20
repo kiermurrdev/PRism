@@ -5,31 +5,32 @@ import { cn } from "@/lib/utils";
 import { CheckCircle2, Loader2, AlertCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { ANALYSIS_RESULT_KEY } from "@/lib/analysis/constants";
+import type { AnalysisSnapshot } from "@/types/analysis";
 
-const STAGES = [
-  "Reading pull request",
-  "Mapping repository components",
-  "Tracing downstream effects",
-  "Generating QA checklist",
-];
+const STAGE_MESSAGES: Record<string, string> = {
+  "Reading pull request": "Reading pull request",
+  "Mapping repository components": "Mapping repository components",
+  "Tracing downstream effects": "Tracing downstream effects",
+  "Generating QA checklist": "Generating QA checklist",
+};
 
-type AnalysisState =
-  | { type: "analyzing" }
-  | { type: "success" }
-  | { type: "error"; message: string };
-
-export type { AnalysisState };
+const STAGES = Object.values(STAGE_MESSAGES);
 
 interface AnalysisProgressProps {
   /** The original PR URL used for the demo/example fallback */
   prUrl: string;
   /** Current analysis state driven by the caller */
-  state: AnalysisState;
+  state:
+    | { type: "analyzing"; snapshot?: AnalysisSnapshot }
+    | { type: "success" }
+    | { type: "error"; message: string };
   /** Called when the user clicks Retry */
   onRetry?: () => void;
   /** Called when the user clicks Back */
   onBack?: () => void;
 }
+
+export type { AnalysisProgressProps };
 
 export function AnalysisProgress({
   prUrl,
@@ -38,35 +39,35 @@ export function AnalysisProgress({
   onBack,
 }: AnalysisProgressProps) {
   const router = useRouter();
-  const [currentStage, setCurrentStage] = React.useState(0);
-  const [completed, setCompleted] = React.useState(false);
 
-  React.useEffect(() => {
-    if (state.type !== "analyzing") return;
+  const snapshot = state.type === "analyzing" ? state.snapshot : undefined;
 
-    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const stageDuration = reducedMotion ? 400 : 800;
+  // Derive active stage directly from the snapshot prop
+  const activeStage =
+    snapshot?.message && STAGES.includes(snapshot.message)
+      ? snapshot.message
+      : null;
 
-    let stage = 0;
-    const interval = setInterval(() => {
-      stage += 1;
-      if (stage >= STAGES.length) {
-        clearInterval(interval);
-        setCompleted(true);
-      } else {
-        setCurrentStage((prev) => prev + 1);
-      }
-    }, stageDuration);
+  // Compute completed stages based on active stage position
+  const completedStages = React.useMemo(() => {
+    if (state.type === "success") {
+      return new Set(STAGES);
+    }
+    if (!activeStage) return new Set<string>();
+    const idx = STAGES.indexOf(activeStage);
+    if (idx === -1) return new Set<string>();
+    const next = new Set<string>();
+    for (let i = 0; i < idx; i++) {
+      next.add(STAGES[i]);
+    }
+    return next;
+  }, [state.type, activeStage]);
 
-    return () => clearInterval(interval);
-  }, [state.type]);
-
-  // When analysis succeeds, navigate based on whether the result is live or mock.
+  // Navigate once when analysis succeeds
   React.useEffect(() => {
     if (state.type !== "success") return;
 
     const timer = setTimeout(() => {
-      // Check the stored result to decide where to navigate.
       const stored = sessionStorage.getItem(ANALYSIS_RESULT_KEY);
       if (stored) {
         try {
@@ -85,7 +86,10 @@ export function AnalysisProgress({
     return () => clearTimeout(timer);
   }, [state.type, prUrl, router]);
 
-  const progressPercent = Math.round(((currentStage + (completed ? 1 : 0)) / STAGES.length) * 100);
+  // Compute progress from completed stages
+  const progressPercent = Math.round(
+    (completedStages.size / STAGES.length) * 100
+  );
 
   if (state.type === "error") {
     return (
@@ -95,7 +99,9 @@ export function AnalysisProgress({
             <AlertCircle className="w-6 h-6 text-[#EF4444]" aria-hidden="true" />
           </div>
           <h2 className="text-lg font-semibold mb-2">Analysis failed</h2>
-          <p className="text-[#94A3B8] text-sm max-w-sm mx-auto">{state.message}</p>
+          <p className="text-[#94A3B8] text-sm max-w-sm mx-auto">
+            {state.message}
+          </p>
         </div>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
           {onRetry && (
@@ -123,7 +129,14 @@ export function AnalysisProgress({
               "transition-colors"
             )}
           >
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+            <svg
+              className="w-4 h-4"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              aria-hidden="true"
+            >
               <path d="M19 12H5M12 19l-7-7 7-7" />
             </svg>
             Back
@@ -142,7 +155,10 @@ export function AnalysisProgress({
         </div>
         <div className="h-1.5 w-full rounded-full bg-[#111827] overflow-hidden">
           <div
-            className="h-full rounded-full bg-gradient-to-r from-[#8B5CF6] to-[#22D3EE] transition-all duration-500 ease-out"
+            className={cn(
+              "h-full rounded-full bg-gradient-to-r from-[#8B5CF6] to-[#22D3EE]",
+              !activeStage && "animate-pulse"
+            )}
             style={{ width: `${progressPercent}%` }}
             role="progressbar"
             aria-valuenow={progressPercent}
@@ -153,9 +169,9 @@ export function AnalysisProgress({
       </div>
 
       <ol className="space-y-3" aria-label="Analysis stages">
-        {STAGES.map((label, index) => {
-          const isCompleted = index < currentStage || completed;
-          const isActive = index === currentStage && !completed;
+        {STAGES.map((label) => {
+          const isCompleted = completedStages.has(label);
+          const isActive = label === activeStage;
 
           return (
             <li
@@ -167,11 +183,20 @@ export function AnalysisProgress({
             >
               <div className="shrink-0">
                 {isCompleted ? (
-                  <CheckCircle2 className="w-5 h-5 text-[#22D3EE]" aria-hidden="true" />
+                  <CheckCircle2
+                    className="w-5 h-5 text-[#22D3EE]"
+                    aria-hidden="true"
+                  />
                 ) : isActive ? (
-                  <Loader2 className="w-5 h-5 text-[#8B5CF6] animate-spin" aria-hidden="true" />
+                  <Loader2
+                    className="w-5 h-5 text-[#8B5CF6] animate-spin"
+                    aria-hidden="true"
+                  />
                 ) : (
-                  <div className="w-5 h-5 rounded-full border-2 border-[#273449]" aria-hidden="true" />
+                  <div
+                    className="w-5 h-5 rounded-full border-2 border-[#273449]"
+                    aria-hidden="true"
+                  />
                 )}
               </div>
               <span

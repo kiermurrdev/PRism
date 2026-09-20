@@ -82,6 +82,6 @@ export interface NemotronClientOptions {
 }
 
 /**
- * Default timeout for Nemotron requests (60 seconds).
+ * Default timeout for Nemotron requests (300 seconds).
  */
-export const DEFAULT_TIMEOUT_MS = 60_000;
+export const DEFAULT_TIMEOUT_MS = 300_000;
