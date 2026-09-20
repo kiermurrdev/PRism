@@ -1,9 +1,31 @@
 /**
- * Canonical TypeScript contracts for the GitHub App integration.
- *
- * These types are used by the webhook handler, comment service, and configuration layer.
- * They are defined here so all consumers share the same shapes.
+ * Valid pull_request actions that trigger PRism processing.
  */
+export type PullRequestAction = "opened" | "reopened" | "synchronize";
+
+/**
+ * A normalized GitHub webhook event for PRism processing.
+ */
+export interface NormalizedWebhookEvent {
+  /** The event type (e.g., "pull_request"). */
+  type: "pull_request";
+  /** The action within the event. */
+  action: PullRequestAction;
+  /** The GitHub event delivery ID. */
+  deliveryId: string;
+  /** The installation ID that triggered the event. */
+  installationId: number;
+  /** The repository full name (owner/repo). */
+  repositoryFullName: string;
+  /** The pull request number. */
+  prNumber: number;
+  /** The pull request URL. */
+  prUrl: string;
+  /** The pull request title. */
+  prTitle: string;
+  /** The head commit SHA. */
+  headSha: string;
+}
 
 /**
  * A validated GitHub webhook event envelope.
