@@ -16,6 +16,7 @@ import { QAChecklist } from "@/components/report/QAChecklist";
 import AffectedFiles from "@/components/report/AffectedFiles";
 import NodeDetailsPanel from "@/components/report/NodeDetailsPanel";
 import ImpactLegend from "@/components/report/ImpactLegend";
+import ReportActions from "@/components/report/ReportActions";
 
 type LoadedResult = { result: AnalysisResult } | { error: LoadResultError };
 
@@ -38,6 +39,11 @@ export default function LiveReportPage() {
   const handleNodeSelect = (node: ReportNode) => {
     setSelectedNode(node);
     setPanelOpen(true);
+  };
+
+  const handleAnalyzeAgain = (prUrl: string) => {
+    const encoded = btoa(prUrl);
+    router.push(`/analyze?pr=${encoded}`);
   };
 
   // Missing / invalid result state
@@ -123,6 +129,9 @@ export default function LiveReportPage() {
                 )}
               </div>
             </div>
+
+            {/* Report actions */}
+            <ReportActions result={data} onAnalyzeAgain={handleAnalyzeAgain} />
           </div>
         </div>
       </header>

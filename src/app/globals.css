@@ -27,3 +27,87 @@ body {
   color: var(--text-primary);
   font-family: var(--font-inter), system-ui, sans-serif;
 }
+
+@media print {
+  /* Force landscape orientation */
+  @page {
+    size: landscape;
+    margin: 1.5cm;
+  }
+
+  /* Retain background colors where supported */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Hide navigation and interactive-only controls */
+  nav,
+  footer,
+  .no-print,
+  button,
+  [role="button"],
+  .react-flow__controls,
+  .react-flow__attribution,
+  details,
+  summary {
+    display: none !important;
+  }
+
+  /* Keep report header visible but simplify it */
+  header:has(h1) {
+    display: block !important;
+    border-color: #d1d5db !important;
+    background: #f9fafb !important;
+    padding: 0.75rem 1rem !important;
+    margin-bottom: 1rem !important;
+  }
+
+  /* Ensure main content is full-width and readable */
+  body {
+    background: white !important;
+    color: #111827 !important;
+  }
+
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  main > div {
+    max-width: none !important;
+  }
+
+  /* Stack graph, summary, findings in print order */
+  .grid {
+    display: block !important;
+  }
+
+  section[aria-label="Impact graph"] {
+    height: 400px !important;
+    margin-bottom: 1.5rem !important;
+    border-color: #d1d5db !important;
+    background: #f9fafb !important;
+  }
+
+  /* Ensure text is readable on white background */
+  h1, h2, h3, h4, h5, h6 {
+    color: #111827 !important;
+  }
+
+  p, li, td, th, span, div {
+    color: #374151 !important;
+  }
+
+  /* Make cards printable */
+  .border {
+    border-color: #d1d5db !important;
+  }
+
+  /* Avoid page breaks inside key sections */
+  section,
+  article,
+  .space-y-6 > * {
+    break-inside: avoid;
+  }
+}
