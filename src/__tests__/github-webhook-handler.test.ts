@@ -38,6 +38,7 @@ describe("webhook handler", () => {
     it("returns 401 when X-Hub-Signature-256 is missing", async () => {
       const req = mockRequest(PULL_REQUEST_OPENED_PAYLOAD, {
         "X-GitHub-Event": "pull_request",
+        "X-GitHub-Delivery": "test-delivery-123",
       });
       const res = await handleWebhook(req, {
         webhookSecret: TEST_WEBHOOK_SECRET,
@@ -51,6 +52,7 @@ describe("webhook handler", () => {
     it("returns 401 for an invalid signature", async () => {
       const req = mockRequest(PULL_REQUEST_OPENED_PAYLOAD, {
         "X-GitHub-Event": "pull_request",
+        "X-GitHub-Delivery": "test-delivery-123",
         "X-Hub-Signature-256": "sha256=invalid",
       });
       const res = await handleWebhook(req, {
@@ -67,6 +69,7 @@ describe("webhook handler", () => {
       const sig = computeSignature(TEST_WEBHOOK_SECRET, body);
       const req = mockRequest(PULL_REQUEST_OPENED_PAYLOAD, {
         "X-GitHub-Event": "pull_request",
+        "X-GitHub-Delivery": "test-delivery-123",
         "X-Hub-Signature-256": sig,
       });
       const res = await handleWebhook(req, {
@@ -78,12 +81,14 @@ describe("webhook handler", () => {
   });
 
   describe("malformed payloads", () => {
-    function signedRequest(payload: unknown) {
+    function signedRequest(payload: unknown, extraHeaders: Record<string, string> = {}) {
       const body = JSON.stringify(payload);
       const sig = computeSignature(TEST_WEBHOOK_SECRET, body);
       return mockRequest(payload, {
         "X-GitHub-Event": "pull_request",
+        "X-GitHub-Delivery": "test-delivery-123",
         "X-Hub-Signature-256": sig,
+        ...extraHeaders,
       });
     }
 
@@ -93,6 +98,7 @@ describe("webhook handler", () => {
       const req = mockRequest({}, {
         "X-Hub-Signature-256": sig,
         "X-GitHub-Event": "pull_request",
+        "X-GitHub-Delivery": "test-delivery-123",
       });
       // Override arrayBuffer to return malformed content
       req.arrayBuffer = async () => raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength) as ArrayBuffer;
@@ -110,6 +116,7 @@ describe("webhook handler", () => {
       const sig = computeSignature(TEST_WEBHOOK_SECRET, payloadBody);
       const req = mockRequest(PULL_REQUEST_OPENED_PAYLOAD, {
         "X-Hub-Signature-256": sig,
+        "X-GitHub-Delivery": "test-delivery-123",
       });
       const res = await handleWebhook(req, {
         webhookSecret: TEST_WEBHOOK_SECRET,
@@ -156,6 +163,7 @@ describe("webhook handler", () => {
       const sig = computeSignature(TEST_WEBHOOK_SECRET, body);
       return mockRequest(payload, {
         "X-GitHub-Event": eventType,
+        "X-GitHub-Delivery": "test-delivery-123",
         "X-Hub-Signature-256": sig,
       });
     }
@@ -224,6 +232,7 @@ describe("webhook handler", () => {
       const sig = computeSignature(TEST_WEBHOOK_SECRET, body);
       return mockRequest(payload, {
         "X-GitHub-Event": "pull_request",
+        "X-GitHub-Delivery": "test-delivery-123",
         "X-Hub-Signature-256": sig,
       });
     }
@@ -253,6 +262,7 @@ describe("webhook handler", () => {
     it("returns 500 when webhook secret is not configured", async () => {
       const req = mockRequest(PULL_REQUEST_OPENED_PAYLOAD, {
         "X-GitHub-Event": "pull_request",
+        "X-GitHub-Delivery": "test-delivery-123",
         "X-Hub-Signature-256": "sha256=test",
       });
       const res = await handleWebhook(req, {
@@ -271,6 +281,7 @@ describe("webhook handler", () => {
       const sig = computeSignature(TEST_WEBHOOK_SECRET, body);
       return mockRequest(payload, {
         "X-GitHub-Event": "pull_request",
+        "X-GitHub-Delivery": "test-delivery-123",
         "X-Hub-Signature-256": sig,
       });
     }
@@ -289,6 +300,7 @@ describe("webhook handler", () => {
     it("does not leak webhook secret in error responses", async () => {
       const req = mockRequest(PULL_REQUEST_OPENED_PAYLOAD, {
         "X-GitHub-Event": "pull_request",
+        "X-GitHub-Delivery": "test-delivery-123",
         "X-Hub-Signature-256": "sha256=invalid",
       });
       const res = await handleWebhook(req, {
@@ -297,6 +309,56 @@ describe("webhook handler", () => {
       });
       const text = await res.text();
       assert.ok(!text.includes(TEST_WEBHOOK_SECRET), "Webhook secret must not appear in response");
+    });
+  });
+
+  describe("header-based field extraction", () => {
+    function signedRequest(payload: unknown, extraHeaders: Record<string, string> = {}) {
+      const body = JSON.stringify(payload);
+      const sig = computeSignature(TEST_WEBHOOK_SECRET, body);
+      return mockRequest(payload, {
+        "X-GitHub-Event": "pull_request",
+        "X-Hub-Signature-256": sig,
+        ...extraHeaders,
+      });
+    }
+
+    it("reads deliveryId from X-GitHub-Delivery header, not payload", async () => {
+      const events: NormalizedWebhookEvent[] = [];
+      const req = signedRequest(PULL_REQUEST_REOPENED_PAYLOAD, {
+        "X-GitHub-Delivery": "header-delivery-id",
+      });
+      await handleWebhook(req, {
+        webhookSecret: TEST_WEBHOOK_SECRET,
+        handler: async (event) => { events.push(event); },
+      });
+      assert.strictEqual(events.length, 1);
+      assert.strictEqual(events[0].deliveryId, "header-delivery-id");
+    });
+
+    it("reads action from top-level payload.action", async () => {
+      const events: NormalizedWebhookEvent[] = [];
+      const req = signedRequest(PULL_REQUEST_REOPENED_PAYLOAD, {
+        "X-GitHub-Delivery": "test-delivery",
+      });
+      await handleWebhook(req, {
+        webhookSecret: TEST_WEBHOOK_SECRET,
+        handler: async (event) => { events.push(event); },
+      });
+      assert.strictEqual(events.length, 1);
+      assert.strictEqual(events[0].action, "reopened");
+    });
+
+    it("returns 400 when X-GitHub-Delivery header is missing", async () => {
+      const req = signedRequest(PULL_REQUEST_OPENED_PAYLOAD, {});
+      const res = await handleWebhook(req, {
+        webhookSecret: TEST_WEBHOOK_SECRET,
+        handler: async () => {},
+      });
+      assert.strictEqual(res.status, 400);
+      const body = await res.json();
+      assert.strictEqual(body.code, "INVALID_PAYLOAD");
+      assert.ok(body.message.includes("X-GitHub-Delivery"));
     });
   });
 });

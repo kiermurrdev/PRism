@@ -9,7 +9,7 @@
 
 import type { GitHubAppAuthError } from "./contracts";
 import { normalizePrivateKey } from "./private-key";
-
+import { createPrivateKey } from "node:crypto";
 /**
  * Default TTL for GitHub App JWTs (10 minutes).
  * GitHub accepts up to 10 minutes; we use the full window.
@@ -63,18 +63,21 @@ export interface JwtCrypto {
  */
 const webCrypto: JwtCrypto = {
   async importKey(pem: string): Promise<CryptoKey> {
-    // Strip PEM headers/footers and whitespace
-    const base64 = pem
-      .replace(/-----BEGIN (RSA )?PRIVATE KEY-----/, "")
-      .replace(/-----END (RSA )?PRIVATE KEY-----/, "")
-      .replace(/\s/g, "");
-
-    const der = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+    // GitHub provides RSA keys that may be PKCS#1. Convert to PKCS#8
+    // because Web Crypto imports private RSA keys in PKCS#8 format.
+    const privateKey = createPrivateKey(pem);
+    const pkcs8 = privateKey.export({
+      type: "pkcs8",
+      format: "der",
+    });
 
     return await globalThis.crypto.subtle.importKey(
       "pkcs8",
-      der,
-      { name: "ECDSA", namedCurve: "P-256" },
+      new Uint8Array(pkcs8),
+      {
+        name: "RSASSA-PKCS1-v1_5",
+        hash: "SHA-256",
+      },
       false,
       ["sign"]
     );
@@ -83,11 +86,12 @@ const webCrypto: JwtCrypto = {
   async sign(key: CryptoKey, header: string, payload: string): Promise<string> {
     const data = new TextEncoder().encode(`${header}.${payload}`);
     const signature = await globalThis.crypto.subtle.sign(
-      "ECDSA",
+      "RSASSA-PKCS1-v1_5",
       key,
       data
     );
-    return btoa(String.fromCharCode(...new Uint8Array(signature)));
+
+    return Buffer.from(signature).toString("base64url");
   },
 };
 
@@ -156,21 +160,21 @@ export async function createJwt(
     const key = await cryptoImpl.importKey(normalizedKey);
     const now = clock.nowSeconds();
 
-    // Build JWT header (ES256)
-    const header = btoa(JSON.stringify({
-      alg: "ES256",
+    // Build JWT header (RS256)
+    const header = Buffer.from(JSON.stringify({
+      alg: "RS256",
       typ: "JWT",
-    }));
+    })).toString("base64url");
 
     // Build JWT payload with clock skew tolerance
     const iat = now - MAX_CLOCK_SKEW_SECONDS;
     const exp = iat + ttl;
 
-    const payload = btoa(JSON.stringify({
+    const payload = Buffer.from(JSON.stringify({
       iss: String(config.appId),
       iat,
       exp,
-    }));
+    })).toString("base64url");
 
     const signature = await cryptoImpl.sign(key, header, payload);
     const jwt = `${header}.${payload}.${signature}`;

@@ -84,9 +84,16 @@ function errorResponse(
 /**
  * Extract and normalize a pull_request event into a typed NormalizedWebhookEvent.
  *
+ * @param payload - The parsed JSON payload body.
+ * @param deliveryId - The delivery ID from the X-GitHub-Delivery header.
+ * @param action - The action string from top-level payload.action.
  * @returns The normalized event, or a WebhookError if validation fails.
  */
-function normalizePullRequestEvent(payload: unknown): NormalizedWebhookEvent | WebhookError {
+function normalizePullRequestEvent(
+  payload: unknown,
+  deliveryId: string,
+  action: string
+): NormalizedWebhookEvent | WebhookError {
   // Check that payload is a plain object
   if (!payload || typeof payload !== "object") {
     return {
@@ -96,15 +103,6 @@ function normalizePullRequestEvent(payload: unknown): NormalizedWebhookEvent | W
   }
 
   const data = payload as Record<string, unknown>;
-
-  // delivery_id
-  const deliveryId = data["X-GitHub-Delivery"] ?? data["delivery_id"];
-  if (!deliveryId || typeof deliveryId !== "string") {
-    return {
-      code: "INVALID_PAYLOAD",
-      message: "Missing or invalid X-GitHub-Delivery.",
-    };
-  }
 
   // installation.id
   const installation = data["installation"];
@@ -187,14 +185,6 @@ function normalizePullRequestEvent(payload: unknown): NormalizedWebhookEvent | W
     };
   }
 
-  const action = pr["action"];
-  if (!action || typeof action !== "string") {
-    return {
-      code: "INVALID_PAYLOAD",
-      message: "Missing pull_request.action.",
-    };
-  }
-
   return {
     type: "pull_request",
     action: action as NormalizedWebhookEvent["action"],
@@ -268,22 +258,32 @@ export async function handleWebhook(
 
   // 6. Handle pull_request events
   if (eventType === "pull_request") {
-    const normalized = normalizePullRequestEvent(parsed);
-    if ("code" in normalized) {
-      return errorResponse(normalized.code, normalized.message, 400, ResponseCtor);
+    const deliveryId = request.headers.get("X-GitHub-Delivery");
+    if (!deliveryId) {
+      return errorResponse("INVALID_PAYLOAD", "X-GitHub-Delivery header is missing.", 400, ResponseCtor);
+    }
+
+    const data = parsed as Record<string, unknown>;
+    const action = data["action"];
+    if (!action || typeof action !== "string") {
+      return errorResponse("INVALID_PAYLOAD", "Missing or invalid action field.", 400, ResponseCtor);
     }
 
     // Only process supported actions; others are acknowledged
-    if (!HANDLED_ACTIONS.has(normalized.action)) {
+    if (!HANDLED_ACTIONS.has(action as NormalizedWebhookEvent["action"])) {
       return new ResponseCtor(null, { status: 200 });
+    }
+
+    const normalized = normalizePullRequestEvent(parsed, deliveryId, action);
+    if ("code" in normalized) {
+      return errorResponse(normalized.code, normalized.message, 400, ResponseCtor);
     }
 
     // Invoke handler asynchronously (do not block the response)
     try {
       await config.handler(normalized);
-    } catch {
-      // Handler errors do not fail the webhook — GitHub will retry.
-      // Log and return success to acknowledge receipt.
+    } catch (error) {
+      console.error("[github-webhook] handler failed:", error);
     }
 
     return new ResponseCtor(null, { status: 200 });

@@ -49,7 +49,6 @@ export type InstallationTokenResult =
 function classifyAuthError(status: number, headers: Headers): GitHubAppAuthError {
   const rateLimitRemaining = headers.get("X-RateLimit-Remaining");
 
-  // Explicit rate limit headers or 429 status
   if (status === 429 || rateLimitRemaining === "0") {
     return {
       code: "GITHUB_RATE_LIMITED",
@@ -79,17 +78,10 @@ function classifyAuthError(status: number, headers: Headers): GitHubAppAuthError
 
 /**
  * Request an installation access token from GitHub.
- *
- * Exchanges a valid GitHub App JWT for a short-lived installation token
- * scoped to the specified installation ID.
- *
- * @param config - The JWT and installation ID.
- * @param fetchFn - Optional fetch implementation for testing.
- * @returns The installation token and expiration timestamp, or a typed error.
  */
 export async function getInstallationAccessToken(
   config: InstallationTokenConfig,
-  fetchFn: FetchFn = defaultFetch
+  fetchFn: FetchFn = defaultFetch,
 ): Promise<InstallationTokenResult> {
   if (!config.installationId || config.installationId <= 0) {
     return {
@@ -119,11 +111,18 @@ export async function getInstallationAccessToken(
       headers: {
         Authorization: `Bearer ${config.jwt}`,
         Accept: "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
         "User-Agent": "PRism-GitHub-App",
       },
     });
 
     if (!response.ok) {
+      console.error("[github-webhook] installation token request failed:", {
+        status: response.status,
+        body: await response.text(),
+        installationId: config.installationId,
+      });
+
       return {
         ok: false,
         error: classifyAuthError(response.status, response.headers),
@@ -147,7 +146,12 @@ export async function getInstallationAccessToken(
       : 0;
 
     return { ok: true, token: data.token, expiresAt };
-  } catch {
+  } catch (error) {
+    console.error(
+      "[github-webhook] installation token request threw:",
+      error instanceof Error ? error.message : "Unknown error",
+    );
+
     return {
       ok: false,
       error: {

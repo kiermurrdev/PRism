@@ -3,12 +3,19 @@
  *
  * These are safe, self-contained payloads for testing the webhook handler
  * without network access or real secrets.
+ *
+ * Structure matches real GitHub webhook payloads:
+ * - X-GitHub-Delivery is sent as a header, NOT in the JSON body.
+ * - action is top-level: payload.action
+ * - PR number is both payload.number and payload.pull_request.number
+ * - installation.id, repository.full_name are top-level
+ * - PR details (html_url, title, head.sha) are under payload.pull_request
  */
 
 import type { PullRequestAction } from "@/lib/github/app/contracts";
 
 /**
- * A minimal, valid pull_request webhook payload.
+ * A minimal, valid pull_request webhook payload matching GitHub's actual structure.
  *
  * @param action - The pull_request action to simulate.
  * @param overrides - Optional overrides for specific fields.
@@ -18,7 +25,8 @@ export function buildPullRequestPayload(
   overrides?: Record<string, unknown>
 ) {
   return {
-    "X-GitHub-Delivery": "test-delivery-123",
+    action,
+    number: 42,
     installation: {
       id: 99999,
     },
@@ -31,7 +39,6 @@ export function buildPullRequestPayload(
       number: 42,
       html_url: "https://github.com/test-owner/test-repo/pull/42",
       title: "Test pull request",
-      action,
       head: {
         sha: "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
         ref: "test-branch",
@@ -66,9 +73,9 @@ export const PULL_REQUEST_SYNCHRONIZE_PAYLOAD = buildPullRequestPayload("synchro
  * A fixture for a "pull_request.closed" event (unsupported action).
  */
 export const PULL_REQUEST_CLOSED_PAYLOAD = buildPullRequestPayload("opened", {
+  action: "closed",
   pull_request: {
     ...buildPullRequestPayload("opened").pull_request,
-    action: "closed",
   },
 });
 
@@ -76,7 +83,6 @@ export const PULL_REQUEST_CLOSED_PAYLOAD = buildPullRequestPayload("opened", {
  * A fixture for a "push" event (unsupported event type).
  */
 export const PUSH_PAYLOAD = {
-  "X-GitHub-Delivery": "test-delivery-456",
   ref: "refs/heads/main",
   installation: {
     id: 99999,

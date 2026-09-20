@@ -5,7 +5,7 @@
  * Uses installation access tokens obtained via the auth layer. All HTTP calls
  * are injectable for testing. No Nemotron analysis runs in the webhook path.
  *
- * SERVER-ONLY.
+ * SERVER-ONLY. Do not import this module into client-side code. Includes temporary API diagnostics.
  */
 
 import type { NormalizedWebhookEvent, PRCommentMarker } from "./contracts";
@@ -90,7 +90,8 @@ export function buildCommentBody(
   headSha: string,
   appUrl: string,
 ): string {
-  const analysisLink = buildAnalysisLink(prUrl);
+  const analysisPath = buildAnalysisLink(prUrl);
+  const analysisLink = new URL(analysisPath, appUrl).toString();
   const shortSha = headSha.slice(0, 7);
 
   return `# PRism Analysis
@@ -224,6 +225,7 @@ export interface PublishOptions {
  */
 export async function publishPrComment(options: PublishOptions): Promise<PublishResult> {
   const { event, config, fetchFn, clock, jwtCrypto } = options;
+  const effectiveFetch: FetchFn = fetchFn ?? globalThis.fetch;
   const { appId, privateKey, appSlug, appUrl } = config;
   const { installationId, repositoryFullName, prNumber, prUrl, prTitle, headSha } = event;
 
@@ -243,7 +245,7 @@ export async function publishPrComment(options: PublishOptions): Promise<Publish
   // Step 2: Get installation access token
   const tokenResult = await getInstallationAccessToken(
     { jwt: jwtResult.jwt, installationId },
-    fetchFn,
+    effectiveFetch,
   );
   if (!tokenResult.ok) {
     return {
@@ -264,7 +266,7 @@ export async function publishPrComment(options: PublishOptions): Promise<Publish
   let comments: GitHubComment[] = [];
 
   try {
-    const listResponse = await fetchFn!(listUrl, {
+    const listResponse = await effectiveFetch(listUrl, {
       method: "GET",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -274,6 +276,11 @@ export async function publishPrComment(options: PublishOptions): Promise<Publish
     });
 
     if (!listResponse.ok) {
+      console.error("[github-webhook] list comments failed:", {
+        status: listResponse.status,
+        body: await listResponse.text(),
+      });
+
       return {
         ok: false,
         error: classifyPublishError(listResponse.status, listResponse.headers),
@@ -316,7 +323,7 @@ export async function publishPrComment(options: PublishOptions): Promise<Publish
     // Step 5a: Update existing comment
     try {
       const updateUrl = `${GITHUB_API_BASE}/repos/${repositoryFullName}/issues/comments/${existingComment.id}`;
-      const updateResponse = await fetchFn!(updateUrl, {
+      const updateResponse = await effectiveFetch(updateUrl, {
         method: "PATCH",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -328,6 +335,11 @@ export async function publishPrComment(options: PublishOptions): Promise<Publish
       });
 
       if (!updateResponse.ok) {
+        console.error("[github-webhook] update comment failed:", {
+          status: updateResponse.status,
+          body: await updateResponse.text(),
+        });
+
         return {
           ok: false,
           error: classifyPublishError(updateResponse.status, updateResponse.headers),
@@ -348,7 +360,7 @@ export async function publishPrComment(options: PublishOptions): Promise<Publish
 
   // Step 5b: Create new comment
   try {
-    const createResponse = await fetchFn!(listUrl, {
+    const createResponse = await effectiveFetch(listUrl, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -360,6 +372,11 @@ export async function publishPrComment(options: PublishOptions): Promise<Publish
     });
 
     if (!createResponse.ok) {
+      console.error("[github-webhook] create comment failed:", {
+        status: createResponse.status,
+        body: await createResponse.text(),
+      });
+
       return {
         ok: false,
         error: classifyPublishError(createResponse.status, createResponse.headers),

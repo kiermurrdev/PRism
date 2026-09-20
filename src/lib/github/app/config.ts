@@ -41,7 +41,7 @@ export function loadGitHubAppConfig():
   }
 
   // Validate GITHUB_APP_PRIVATE_KEY
-  const privateKey = process.env.GITHUB_APP_PRIVATE_KEY;
+  const privateKey = process.env.GITHUB_APP_PRIVATE_KEY?.replace(/\\n/g, "\n");
   if (!privateKey) {
     return {
       ok: false,

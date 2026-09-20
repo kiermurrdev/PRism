@@ -37,11 +37,9 @@ async function webhookHandler(event: NormalizedWebhookEvent): Promise<void> {
       config: { appId, privateKey, appSlug, appUrl },
     });
 
-    // Silent success/error — webhook should not fail on downstream issues.
-    // In production, this would be logged to a structured logger.
-    void result;
-  } catch {
-    // Handled silently — GitHub will retry.
+    console.log("[github-webhook] publish result:", result);
+  } catch (error) {
+    console.error("[github-webhook] publish threw:", error);
   }
 }
 
