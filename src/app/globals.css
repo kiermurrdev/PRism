@@ -28,8 +28,129 @@ body {
   font-family: var(--font-inter), system-ui, sans-serif;
 }
 
+/* ============================================================
+   GITHUB INSTALL PAGE
+   ============================================================ */
+.github-install {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  background: var(--background);
+  color: var(--text-primary);
+  font-family: var(--font-inter), system-ui, sans-serif;
+}
+.github-install-content {
+  max-width: 520px;
+  width: 100%;
+  text-align: center;
+}
+.github-install-icon {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 28px;
+  background: color-mix(in srgb, var(--accent-cyan) 15%, transparent);
+  color: var(--accent-cyan);
+}
+.github-install-icon-warn {
+  background: color-mix(in srgb, var(--status-changed) 15%, transparent);
+  color: var(--status-changed);
+}
+.github-install-icon-error {
+  background: color-mix(in srgb, var(--status-possible) 15%, transparent);
+  color: var(--status-possible);
+}
+.github-install h1 {
+  font-size: 1.75rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  letter-spacing: -0.02em;
+}
+.github-install-message {
+  color: var(--text-muted);
+  font-size: 1rem;
+  margin-bottom: 1.25rem;
+}
+.github-install-details {
+  text-align: left;
+  margin-bottom: 1.5rem;
+  padding: 1rem 1.25rem;
+  background: color-mix(in srgb, var(--surface) 60%, transparent);
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+.github-install-details p {
+  margin-bottom: 0.5rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+.github-install-details ul {
+  margin: 0.5rem 0 0.75rem 1.25rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+.github-install-details li {
+  margin-bottom: 0.35rem;
+}
+.github-install-note {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  margin-top: 0.75rem;
+}
+.github-install-error {
+  color: var(--status-possible);
+  font-size: 0.9rem;
+  margin-bottom: 0.75rem;
+}
+.github-install-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+.github-install-btn {
+  display: inline-block;
+  padding: 0.7rem 1.5rem;
+  border-radius: 999px;
+  background: var(--accent-cyan);
+  color: #06111B;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.25s ease;
+}
+.github-install-btn:hover {
+  background: color-mix(in srgb, var(--accent-cyan) 86%, #FFFFFF);
+}
+.github-install-link {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  text-decoration: none;
+  transition: color 0.25s ease;
+}
+.github-install-link:hover {
+  color: var(--text-primary);
+}
+.github-install-loading {
+  color: var(--text-muted);
+  font-size: 1rem;
+}
+@media (min-width: 480px) {
+  .github-install-actions {
+    flex-direction: row;
+    justify-content: center;
+    gap: 1rem;
+  }
+}
+
 @media print {
-  /* Force landscape orientation */
   @page {
     size: landscape;
     margin: 1.5cm;

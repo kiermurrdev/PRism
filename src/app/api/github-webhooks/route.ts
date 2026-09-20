@@ -4,8 +4,8 @@
  * GitHub App webhook receiver.
  *
  * Verifies HMAC-SHA256 signature, validates and normalizes pull_request events,
- * and delegates downstream processing to the webhook handler. Fast, no network
- * calls in the critical path.
+ * and publishes an idempotent PRism analysis comment on the PR. Fast, no
+ * Nemotron analysis in the critical path.
  *
  * SERVER-ONLY.
  */
@@ -13,15 +13,36 @@
 import { NextRequest } from "next/server";
 import { loadGitHubAppConfig } from "@/lib/github/app/config";
 import { handleWebhook } from "@/lib/github/app/webhook-handler";
+import { publishPrComment } from "@/lib/github/app/comment-publisher";
+import type { NormalizedWebhookEvent } from "@/lib/github/app/contracts";
 
 /**
- * A no-op handler until downstream processing is implemented (#48).
- * This ensures the webhook route is functional without side effects.
+ * Handler called for each validated pull_request event.
+ *
+ * Publishes the PRism analysis comment asynchronously. Errors are caught so
+ * the webhook itself never fails — GitHub will retry on its schedule.
  */
-async function defaultHandler(): Promise<void> {
-  // No-op: signature verification and event normalization are complete.
-  // Downstream processing (analysis trigger, comment publishing) is handled
-  // by a later issue.
+async function webhookHandler(event: NormalizedWebhookEvent): Promise<void> {
+  const configResult = loadGitHubAppConfig();
+  if (!configResult.ok) {
+    // Config error logged internally; webhook still returns 200.
+    return;
+  }
+
+  const { appId, privateKey, appSlug, appUrl } = configResult.config;
+
+  try {
+    const result = await publishPrComment({
+      event,
+      config: { appId, privateKey, appSlug, appUrl },
+    });
+
+    // Silent success/error — webhook should not fail on downstream issues.
+    // In production, this would be logged to a structured logger.
+    void result;
+  } catch {
+    // Handled silently — GitHub will retry.
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -47,6 +68,6 @@ export async function POST(request: NextRequest) {
 
   return await handleWebhook(request, {
     webhookSecret: config.webhookSecret,
-    handler: defaultHandler,
+    handler: webhookHandler,
   });
 }

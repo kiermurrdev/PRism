@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { useFocusPrInput } from "@/hooks/useLanding";
+import ConnectGitHub from "./ConnectGitHub";
 
 const SECTIONS = [
   { id: "evidence", label: "Evidence" },
@@ -84,6 +85,7 @@ export default function SiteNav() {
             <a className="nav-link" href="https://github.com/kiermurrdev/PRism">
               GitHub
             </a>
+            <ConnectGitHub />
             <button className="nav-primary" type="button" onClick={focusInput}>
               Analyze a PR
             </button>
