@@ -22,12 +22,18 @@ Missing or invalid values produce a `GitHubAppConfigError` with a sanitized mess
 
 1. Developer creates a GitHub App at https://github.com/settings/apps/new.
 2. Sets the following:
+   - **App name**: e.g., "PRism"
    - **Homepage URL**: value of `NEXT_PUBLIC_APP_URL`.
-   - **Webhook URL**: `<NEXT_PUBLIC_APP_URL>/api/github/webhook`.
-   - **Webhook secret**: stored in `GITHUB_WEBHOOK_SECRET`.
+   - **Callback URL**: `<NEXT_PUBLIC_APP_URL>/github-install`
+   - **Webhook URL**: `<NEXT_PUBLIC_APP_URL>/api/github-webhooks`.
+   - **Webhook secret**: generate a strong random string; store it as `GITHUB_WEBHOOK_SECRET`.
+   - **Enable webhooks**: checked.
    - **Allow auto-installation**: enabled.
-3. Sets repository permissions (see below).
-4. Subscribes to events (see below).
+3. **Permissions**:
+   - Pull requests: Read & write
+   - Contents: Read-only
+4. **Subscribed events**:
+   - Pull request
 5. Downloads the private key and stores it as `GITHUB_APP_PRIVATE_KEY`.
 6. Records the app ID as `GITHUB_APP_ID` and app slug as `GITHUB_APP_SLUG`.
 7. Installs the app on one or more repositories.
@@ -43,7 +49,7 @@ Missing or invalid values produce a `GitHubAppConfigError` with a sanitized mess
 
 ### Endpoint
 
-- **URL**: `<NEXT_PUBLIC_APP_URL>/api/github/webhook`
+- **URL**: `<NEXT_PUBLIC_APP_URL>/api/github-webhooks`
 - **Method**: POST
 - **Content-Type**: application/json
 - **Signature header**: `X-Hub-Signature-256`
@@ -154,3 +160,36 @@ This link:
 - No rate-limit backoff beyond basic retries.
 - No multi-language support in comments.
 - No deletion or archival of analysis data.
+
+## Deployment Checklist
+
+1. Choose a hosting provider (Vercel recommended).
+2. Set all environment variables from `.env.example` on the platform.
+3. Deploy the reviewed commit.
+4. Update GitHub App settings:
+   - **Homepage URL**: `<NEXT_PUBLIC_APP_URL>`
+   - **Callback URL**: `<NEXT_PUBLIC_APP_URL>/github-install`
+   - **Webhook URL**: `<NEXT_PUBLIC_APP_URL>/api/github-webhooks`
+5. Install the app on at least one test repository.
+
+## Live Verification Steps
+
+1. Open a pull request on a repository where PRism is installed.
+2. Confirm a PRism comment appears within a minute.
+3. Click the analysis link — it should open the interactive report.
+4. Push a new commit to the same PR; the existing comment should update (no duplicates).
+5. Verify report export from the web UI.
+
+## Rollback / Disable Instructions
+
+To disable PRism without deleting it:
+
+1. In GitHub App settings, disable the webhook, or
+2. Uninstall the app from the target repositories.
+
+To fully remove: delete the app at https://github.com/settings/apps.
+
+To rollback a deployment:
+
+1. Revert to the previous commit on your hosting platform.
+2. GitHub App configuration remains unchanged.

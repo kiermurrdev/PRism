@@ -7,7 +7,9 @@
 
 import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
+import type { NextRequest } from "next/server";
 import { handleWebhook } from "@/lib/github/app/webhook-handler";
+import type { NormalizedWebhookEvent } from "@/lib/github/app/contracts";
 import { computeSignature } from "@/lib/github/app/webhook";
 import {
   TEST_WEBHOOK_SECRET,
@@ -21,14 +23,14 @@ import {
 /**
  * Create a mock NextRequest from a payload and headers.
  */
-function mockRequest(payload: unknown, headers: Record<string, string>) {
+function mockRequest(payload: unknown, headers: Record<string, string>): NextRequest {
   const body = JSON.stringify(payload);
   const buffer = Buffer.from(body);
   return {
     headers: new Headers(headers),
     arrayBuffer: async () => buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer,
     json: async () => payload,
-  } as any;
+  } as NextRequest;
 }
 
 describe("webhook handler", () => {
@@ -128,8 +130,7 @@ describe("webhook handler", () => {
     });
 
     it("returns 400 when installation is missing", async () => {
-      const payload = { ...PULL_REQUEST_OPENED_PAYLOAD };
-      delete (payload as any).installation;
+      const payload = { ...PULL_REQUEST_OPENED_PAYLOAD, installation: undefined };
       const req = signedRequest(payload);
       const res = await handleWebhook(req, {
         webhookSecret: TEST_WEBHOOK_SECRET,
@@ -139,8 +140,7 @@ describe("webhook handler", () => {
     });
 
     it("returns 400 when pull_request object is missing", async () => {
-      const payload = { ...PULL_REQUEST_OPENED_PAYLOAD };
-      delete (payload as any).pull_request;
+      const payload = { ...PULL_REQUEST_OPENED_PAYLOAD, pull_request: undefined };
       const req = signedRequest(payload);
       const res = await handleWebhook(req, {
         webhookSecret: TEST_WEBHOOK_SECRET,
@@ -161,35 +161,38 @@ describe("webhook handler", () => {
     }
 
     it("invokes handler for pull_request.opened", async () => {
-      let received: any = null;
+      const events: NormalizedWebhookEvent[] = [];
       const req = signedRequest(PULL_REQUEST_OPENED_PAYLOAD, "pull_request");
       await handleWebhook(req, {
         webhookSecret: TEST_WEBHOOK_SECRET,
-        handler: async (event) => { received = event; },
+        handler: async (event) => { events.push(event); },
       });
-      assert.ok(received);
+      assert.strictEqual(events.length, 1);
+      const [received] = events;
       assert.strictEqual(received.type, "pull_request");
       assert.strictEqual(received.action, "opened");
     });
 
     it("invokes handler for pull_request.reopened", async () => {
-      let received: any = null;
+      const events: NormalizedWebhookEvent[] = [];
       const req = signedRequest(PULL_REQUEST_REOPENED_PAYLOAD, "pull_request");
       await handleWebhook(req, {
         webhookSecret: TEST_WEBHOOK_SECRET,
-        handler: async (event) => { received = event; },
+        handler: async (event) => { events.push(event); },
       });
-      assert.strictEqual(received?.action, "reopened");
+      assert.strictEqual(events.length, 1);
+      assert.strictEqual(events[0].action, "reopened");
     });
 
     it("invokes handler for pull_request.synchronize", async () => {
-      let received: any = null;
+      const events: NormalizedWebhookEvent[] = [];
       const req = signedRequest(PULL_REQUEST_SYNCHRONIZE_PAYLOAD, "pull_request");
       await handleWebhook(req, {
         webhookSecret: TEST_WEBHOOK_SECRET,
-        handler: async (event) => { received = event; },
+        handler: async (event) => { events.push(event); },
       });
-      assert.strictEqual(received?.action, "synchronize");
+      assert.strictEqual(events.length, 1);
+      assert.strictEqual(events[0].action, "synchronize");
     });
 
     it("returns 200 without invoking handler for pull_request.closed", async () => {
@@ -226,12 +229,14 @@ describe("webhook handler", () => {
     }
 
     it("normalizes all required fields", async () => {
-      let received: any = null;
+      const events: NormalizedWebhookEvent[] = [];
       const req = signedRequest(PULL_REQUEST_OPENED_PAYLOAD);
       await handleWebhook(req, {
         webhookSecret: TEST_WEBHOOK_SECRET,
-        handler: async (event) => { received = event; },
+        handler: async (event) => { events.push(event); },
       });
+      assert.strictEqual(events.length, 1);
+      const received = events[0];
       assert.deepStrictEqual(received.type, "pull_request");
       assert.deepStrictEqual(received.action, "opened");
       assert.deepStrictEqual(received.deliveryId, "test-delivery-123");

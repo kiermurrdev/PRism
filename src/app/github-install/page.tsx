@@ -1,5 +1,3 @@
-"use client";
-
 /**
  * GET /github-install
  *
@@ -11,62 +9,37 @@
  * without verification.
  */
 
+import Link from "next/link";
 import { parseInstallationCallback } from "@/lib/github/app/installation";
-import { Suspense, useEffect, useState } from "react";
 
-export default function GitHubInstallPage() {
-  return (
-    <Suspense fallback={<div className="github-install">Loading...</div>}>
-      <GitHubInstallContent />
-    </Suspense>
-  );
+interface Props {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
-interface ParsedState {
-  ok: boolean;
-  setupAction?: string;
-  installationId?: number;
-  reason?: string;
-}
-
-function GitHubInstallContent() {
-  const [state, setState] = useState<ParsedState | null>(null);
-
-  useEffect(() => {
-    const url = new URL(window.location.href);
-    const result = parseInstallationCallback(url.searchParams);
-
-    if (result.ok) {
-      setState({ ok: true, setupAction: result.setupAction, installationId: result.installationId });
-    } else {
-      setState({ ok: false, reason: result.reason });
+export default async function GitHubInstallPage({ searchParams }: Props) {
+  const resolved = await searchParams;
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(resolved)) {
+    if (typeof value === "string") {
+      params.set(key, value);
     }
-  }, []);
+  }
+  const result = parseInstallationCallback(params);
 
-  if (!state) {
-    return (
-      <div className="github-install">
-        <div className="github-install-content">
-          <div className="github-install-loading">Verifying installation...</div>
-        </div>
-      </div>
-    );
+  if (!result.ok) {
+    return <InvalidCallback reason={result.reason ?? "Unknown error."} />;
   }
 
-  if (!state.ok) {
-    return <InvalidCallback reason={state.reason ?? "Unknown error."} />;
+  if (result.setupAction === "installed") {
+    return <InstalledSuccess installationId={result.installationId ?? 0} />;
   }
 
-  if (state.setupAction === "installed") {
-    return <InstalledSuccess installationId={state.installationId ?? 0} />;
-  }
-
-  if (state.setupAction === "uninstalled") {
+  if (result.setupAction === "uninstalled") {
     return <UninstalledNotice />;
   }
 
-  if (state.setupAction === "updated") {
-    return <UpdatedSuccess installationId={state.installationId ?? 0} />;
+  if (result.setupAction === "updated") {
+    return <UpdatedSuccess installationId={result.installationId ?? 0} />;
   }
 
   return <InvalidCallback reason="Unknown installation action." />;
@@ -100,12 +73,12 @@ function InstalledSuccess({ installationId }: { installationId: number }) {
           </p>
         </div>
         <div className="github-install-actions">
-          <a href="/analyze" className="github-install-btn">
+          <Link href="/analyze" className="github-install-btn">
             Analyze a PR now
-          </a>
-          <a href="/" className="github-install-link">
+          </Link>
+          <Link href="/" className="github-install-link">
             Return to homepage
-          </a>
+          </Link>
         </div>
       </div>
     </div>
@@ -126,12 +99,12 @@ function UpdatedSuccess({ installationId }: { installationId: number }) {
           verified automatically when the next pull request event arrives.
         </p>
         <div className="github-install-actions">
-          <a href="/analyze" className="github-install-btn">
+          <Link href="/analyze" className="github-install-btn">
             Analyze a PR now
-          </a>
-          <a href="/" className="github-install-link">
+          </Link>
+          <Link href="/" className="github-install-link">
             Return to homepage
-          </a>
+          </Link>
         </div>
       </div>
     </div>
@@ -152,12 +125,12 @@ function UninstalledNotice() {
           Automatic webhook-based analysis requires the app to be installed.
         </p>
         <div className="github-install-actions">
-          <a href="/analyze" className="github-install-btn">
+          <Link href="/analyze" className="github-install-btn">
             Analyze a PR manually
-          </a>
-          <a href="/" className="github-install-link">
+          </Link>
+          <Link href="/" className="github-install-link">
             Return to homepage
-          </a>
+          </Link>
         </div>
       </div>
     </div>
@@ -181,9 +154,9 @@ function InvalidCallback({ reason }: { reason: string }) {
           homepage. If the problem persists, contact support.
         </p>
         <div className="github-install-actions">
-          <a href="/" className="github-install-btn">
+          <Link href="/" className="github-install-btn">
             Return to homepage
-          </a>
+          </Link>
         </div>
       </div>
     </div>
