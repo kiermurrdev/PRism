@@ -98,6 +98,28 @@ export interface GitHubAppConfigError {
 }
 
 /**
+ * Error codes for GitHub App authentication operations.
+ */
+export type GitHubAppAuthErrorCode =
+  | "MISSING_GITHUB_APP_ID"
+  | "MISSING_GITHUB_APP_PRIVATE_KEY"
+  | "INVALID_GITHUB_APP_PRIVATE_KEY"
+  | "JWT_SIGNING_FAILED"
+  | "MISSING_INSTALLATION_ID"
+  | "GITHUB_AUTH_REJECTED"
+  | "GITHUB_RATE_LIMITED"
+  | "GITHUB_NETWORK_ERROR"
+  | "GITHUB_UPSTREAM_ERROR";
+
+/**
+ * A typed authentication error for the GitHub App integration.
+ */
+export interface GitHubAppAuthError {
+  code: GitHubAppAuthErrorCode;
+  message: string;
+}
+
+/**
  * Validated runtime configuration for the GitHub App.
  */
 export interface GitHubAppConfig {
