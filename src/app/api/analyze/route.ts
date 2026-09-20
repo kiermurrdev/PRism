@@ -4,11 +4,12 @@
  * Orchestrates the full PR analysis pipeline with concurrency guard and caching:
  * 1. Validate request body and construct PR URL
  * 2. Apply one-at-a-time concurrency guard
- * 3. Ingest PR via GitHub module
- * 4. Generate bounded context
- * 5. Analyze via Nemotron
- * 6. Validate final result against shared schema
- * 7. Return success or safe error envelope
+ * 3. Stream real-time progress snapshots via NDJSON
+ * 4. Ingest PR via GitHub module
+ * 5. Generate bounded context
+ * 6. Analyze via Nemotron
+ * 7. Validate final result against shared schema
+ * 8. Return success or safe error envelope
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -18,77 +19,23 @@ import { generateContext } from "@/lib/analysis/context/generator";
 import { analyzeWithNemotron } from "@/lib/nemotron";
 import type { NemotronError, NemotronContext } from "@/lib/nemotron/types";
 import { AnalysisRequestSchema, AnalysisResultSchema } from "@/lib/analysis/schema";
-import type { AnalysisResult } from "@/types/analysis";
+import type { AnalysisResult, AnalysisSnapshot } from "@/types/analysis";
 import { withAnalysisGuard, buildCacheKey } from "@/lib/server/analysis-guard";
 
 /**
- * Map a GitHubError to a safe HTTP response.
+ * NDJSON progress event types streamed to the client.
  */
-function githubErrorResponse(error: GitHubError): NextResponse {
-  const { code, message } = error;
-
-  switch (code) {
-    case "INVALID_URL":
-      return NextResponse.json({ code, message }, { status: 400 });
-    case "PR_NOT_FOUND":
-      return NextResponse.json({ code, message }, { status: 404 });
-    case "RATE_LIMITED":
-      return NextResponse.json({ code, message }, { status: 429 });
-    case "ACCESS_DENIED":
-      return NextResponse.json({ code, message }, { status: 403 });
-    case "TOO_LARGE":
-      return NextResponse.json({ code, message }, { status: 413 });
-    case "NETWORK_ERROR":
-    case "GITHUB_ERROR":
-    default:
-      return NextResponse.json(
-        { code: "GITHUB_ERROR", message: "A GitHub API error occurred." },
-        { status: 502 }
-      );
-  }
-}
+type ProgressEvent =
+  | { type: "stage"; snapshot: AnalysisSnapshot }
+  | { type: "complete"; data: AnalysisResult }
+  | { type: "error"; code: string; message: string };
 
 /**
- * Map a NemotronError to a safe HTTP response.
+ * Write an NDJSON line to a writable stream.
  */
-function nemotronErrorResponse(error: NemotronError): NextResponse {
-  const { code } = error;
-
-  switch (code) {
-    case "MISSING_CONFIG":
-      return NextResponse.json(
-        { code, message: "Analysis service is misconfigured." },
-        { status: 503 }
-      );
-    case "TIMEOUT":
-      return NextResponse.json(
-        { code, message: "Analysis request timed out." },
-        { status: 504 }
-      );
-    case "AUTH_FAILURE":
-      return NextResponse.json(
-        { code, message: "Analysis service authentication failed." },
-        { status: 502 }
-      );
-    case "RATE_LIMITED":
-      return NextResponse.json(
-        { code, message: "Analysis service rate limit exceeded." },
-        { status: 429 }
-      );
-    case "INVALID_JSON":
-    case "SCHEMA_INVALID":
-      return NextResponse.json(
-        { code, message: "Analysis service returned invalid data." },
-        { status: 502 }
-      );
-    case "NETWORK_ERROR":
-    case "UPSTREAM_ERROR":
-    default:
-      return NextResponse.json(
-        { code: "UPSTREAM_ERROR", message: "Analysis service error." },
-        { status: 502 }
-      );
-  }
+function writeEvent(stream: WritableStreamDefaultWriter, event: ProgressEvent): void {
+  const line = JSON.stringify(event) + "\n";
+  stream.write(new TextEncoder().encode(line));
 }
 
 /**
@@ -130,9 +77,23 @@ function mapChangedFiles(
 
 /**
  * Core analysis pipeline (called inside the concurrency guard).
+ * Emits stage events via the provided writer as work progresses.
  */
-async function runAnalysis(repo: string, prNumber: number, prUrl: string): Promise<AnalysisResult> {
+async function runAnalysis(
+  repo: string,
+  prNumber: number,
+  prUrl: string,
+  writer: WritableStreamDefaultWriter
+): Promise<AnalysisResult> {
   // 1. Ingest PR via GitHub module
+  writeEvent(writer, {
+    type: "stage",
+    snapshot: {
+      status: "fetching",
+      message: "Reading pull request",
+    },
+  });
+
   const ingestResult = await ingestPR(prUrl);
   if (!ingestResult.ok) {
     throw ingestResult.error;
@@ -141,6 +102,14 @@ async function runAnalysis(repo: string, prNumber: number, prUrl: string): Promi
   const snapshot = ingestResult.snapshot;
 
   // 2. Generate bounded context
+  writeEvent(writer, {
+    type: "stage",
+    snapshot: {
+      status: "analyzing",
+      message: "Mapping repository components",
+    },
+  });
+
   const { context: repoContext } = generateContext(snapshot);
 
   // 3. Build Nemotron context from snapshot
@@ -157,14 +126,31 @@ async function runAnalysis(repo: string, prNumber: number, prUrl: string): Promi
   };
 
   // 4. Analyze via Nemotron
+  writeEvent(writer, {
+    type: "stage",
+    snapshot: {
+      status: "analyzing",
+      message: "Tracing downstream effects",
+    },
+  });
+
   const nemotronResult = await analyzeWithNemotron(nemotronContext);
   if (!nemotronResult.ok) {
     throw nemotronResult.error;
   }
 
+  // 5. Signal final stage
+  writeEvent(writer, {
+    type: "stage",
+    snapshot: {
+      status: "generating",
+      message: "Generating QA checklist",
+    },
+  });
+
   const report = nemotronResult.report;
 
-  // 5. Construct AnalysisResult and validate against schema
+  // 6. Construct AnalysisResult and validate against schema
   const analysisResult: AnalysisResult = {
     ...report,
     metadata: {
@@ -183,123 +169,157 @@ async function runAnalysis(repo: string, prNumber: number, prUrl: string): Promi
 }
 
 export async function POST(request: NextRequest) {
+  // 1. Parse and validate request body
+  let body: unknown;
   try {
-    // 1. Parse and validate request body
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return NextResponse.json(
-        {
-          code: "INVALID_REQUEST",
-          message: "Request body must be valid JSON.",
-        },
-        { status: 400 }
-      );
-    }
-
-    const parseResult = AnalysisRequestSchema.safeParse(body);
-    if (!parseResult.success) {
-      return NextResponse.json(
-        {
-          code: "INVALID_REQUEST",
-          message: "Invalid request payload.",
-        },
-        { status: 400 }
-      );
-    }
-
-    const { repo, prNumber } = parseResult.data;
-    const prUrl = buildPRUrl(repo, prNumber);
-
-    // 2. First, do a quick ingest to get headSha for cache keying
-    // (This is lightweight compared to the full analysis)
-    const ingestResult = await ingestPR(prUrl);
-    if (!ingestResult.ok) {
-      return githubErrorResponse(ingestResult.error);
-    }
-
-    const snapshot = ingestResult.snapshot;
-    const key = buildCacheKey(repo, prNumber, snapshot.headSha);
-
-    // 3. Run analysis under the concurrency guard
-    try {
-      const result = await withAnalysisGuard(key, async () => {
-        return runAnalysis(repo, prNumber, prUrl);
-      });
-      return NextResponse.json(result);
-    } catch (err) {
-      if (err instanceof Error) {
-        // Guard timeout
-        if (err.message.includes("in progress")) {
-          return NextResponse.json(
-            {
-              code: "CONCURRENT_REQUEST",
-              message: "Another analysis is in progress. Please try again shortly.",
-            },
-            { status: 409 }
-          );
-        }
-        // Guard state error
-        if (err.message.includes("guard state error")) {
-          return NextResponse.json(
-            {
-              code: "INTERNAL_ERROR",
-              message: "An unexpected error occurred.",
-            },
-            { status: 500 }
-          );
-        }
-      }
-
-      // Check if it's a GitHubError or NemotronError
-      const typedErr = err as GitHubError | NemotronError;
-      if ("code" in typedErr) {
-        const githubErr = typedErr as GitHubError;
-        if (
-          githubErr.code === "INVALID_URL" ||
-          githubErr.code === "PR_NOT_FOUND" ||
-          githubErr.code === "RATE_LIMITED" ||
-          githubErr.code === "ACCESS_DENIED" ||
-          githubErr.code === "TOO_LARGE" ||
-          githubErr.code === "NETWORK_ERROR" ||
-          githubErr.code === "GITHUB_ERROR"
-        ) {
-          return githubErrorResponse(githubErr);
-        }
-
-        const nemotronErr = typedErr as NemotronError;
-        if (
-          nemotronErr.code === "MISSING_CONFIG" ||
-          nemotronErr.code === "TIMEOUT" ||
-          nemotronErr.code === "AUTH_FAILURE" ||
-          nemotronErr.code === "RATE_LIMITED" ||
-          nemotronErr.code === "INVALID_JSON" ||
-          nemotronErr.code === "SCHEMA_INVALID" ||
-          nemotronErr.code === "NETWORK_ERROR" ||
-          nemotronErr.code === "UPSTREAM_ERROR"
-        ) {
-          return nemotronErrorResponse(nemotronErr);
-        }
-      }
-
-      // Catch-all: never expose stack traces or internals
-      return NextResponse.json(
-        {
-          code: "INTERNAL_ERROR",
-          message: "An unexpected error occurred.",
-        },
-        { status: 500 }
-      );
-    }
+    body = await request.json();
   } catch {
-    // Catch-all: never expose stack traces or internals
     return NextResponse.json(
       {
-        code: "INTERNAL_ERROR",
-        message: "An unexpected error occurred.",
+        code: "INVALID_REQUEST",
+        message: "Request body must be valid JSON.",
       },
-      { status: 500 }
+      { status: 400 }
     );
   }
+
+  const parseResult = AnalysisRequestSchema.safeParse(body);
+  if (!parseResult.success) {
+    return NextResponse.json(
+      {
+        code: "INVALID_REQUEST",
+        message: "Invalid request payload.",
+      },
+      { status: 400 }
+    );
+  }
+
+  const { repo, prNumber } = parseResult.data;
+  const prUrl = buildPRUrl(repo, prNumber);
+
+  // Create a TransformStream to pipe NDJSON events to the client
+  const { readable, writable } = new TransformStream();
+  const writer = writable.getWriter();
+
+  // Run the pipeline asynchronously
+  (async () => {
+    try {
+      // First, do a quick ingest to get headSha for cache keying
+      const ingestResult = await ingestPR(prUrl);
+      if (!ingestResult.ok) {
+        const err = ingestResult.error;
+        writeEvent(writer, { type: "error", code: err.code, message: err.message });
+        await writer.close();
+        return;
+      }
+
+      const snapshot = ingestResult.snapshot;
+      const key = buildCacheKey(repo, prNumber, snapshot.headSha);
+
+      // Run analysis under the concurrency guard
+      const result = await withAnalysisGuard(key, async () => {
+        return runAnalysis(repo, prNumber, prUrl, writer);
+      });
+
+      // Emit final result
+      writeEvent(writer, { type: "complete", data: result });
+      await writer.close();
+    } catch (err) {
+      try {
+        if (err instanceof Error) {
+          // Guard timeout
+          if (err.message.includes("in progress")) {
+            writeEvent(writer, {
+              type: "error",
+              code: "CONCURRENT_REQUEST",
+              message: "Another analysis is in progress. Please try again shortly.",
+            });
+            await writer.close();
+            return;
+          }
+          // Guard state error
+          if (err.message.includes("guard state error")) {
+            writeEvent(writer, {
+              type: "error",
+              code: "INTERNAL_ERROR",
+              message: "An unexpected error occurred.",
+            });
+            await writer.close();
+            return;
+          }
+        }
+
+        // Check if it's a GitHubError or NemotronError
+        const typedErr = err as GitHubError | NemotronError;
+        if ("code" in typedErr) {
+          const githubErr = typedErr as GitHubError;
+          if (
+            githubErr.code === "INVALID_URL" ||
+            githubErr.code === "PR_NOT_FOUND" ||
+            githubErr.code === "RATE_LIMITED" ||
+            githubErr.code === "ACCESS_DENIED" ||
+            githubErr.code === "TOO_LARGE" ||
+            githubErr.code === "NETWORK_ERROR" ||
+            githubErr.code === "GITHUB_ERROR"
+          ) {
+            writeEvent(writer, {
+              type: "error",
+              code: githubErr.code,
+              message: githubErr.message,
+            });
+            await writer.close();
+            return;
+          }
+
+          const nemotronErr = typedErr as NemotronError;
+          if (
+            nemotronErr.code === "MISSING_CONFIG" ||
+            nemotronErr.code === "TIMEOUT" ||
+            nemotronErr.code === "AUTH_FAILURE" ||
+            nemotronErr.code === "RATE_LIMITED" ||
+            nemotronErr.code === "INVALID_JSON" ||
+            nemotronErr.code === "SCHEMA_INVALID" ||
+            nemotronErr.code === "NETWORK_ERROR" ||
+            nemotronErr.code === "UPSTREAM_ERROR"
+          ) {
+            writeEvent(writer, {
+              type: "error",
+              code: nemotronErr.code,
+              message: nemotronErr.message,
+            });
+            await writer.close();
+            return;
+          }
+        }
+
+        // Catch-all
+        writeEvent(writer, {
+          type: "error",
+          code: "INTERNAL_ERROR",
+          message: "An unexpected error occurred.",
+        });
+      } finally {
+        await writer.close().catch(() => {});
+      }
+    }
+  })().catch(async () => {
+    // Outer catch for any unhandled promise rejection
+    try {
+      writeEvent(writer, {
+        type: "error",
+        code: "INTERNAL_ERROR",
+        message: "An unexpected error occurred.",
+      });
+    } finally {
+      await writer.close().catch(() => {});
+    }
+  });
+
+  return new NextResponse(readable, {
+    headers: {
+      "Content-Type": "application/x-ndjson",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+    },
+  });
 }

@@ -32,7 +32,7 @@ interface CacheEntry {
  * - 5 minute cache window for the same PR/SHA
  */
 const DEFAULT_CONFIG: GuardConfig = {
-  maxWaitMs: 10_000,
+  maxWaitMs: 150_000,
   cacheTtlMs: 5 * 60 * 1000,
 };
 

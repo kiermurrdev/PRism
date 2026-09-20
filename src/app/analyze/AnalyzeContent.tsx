@@ -3,11 +3,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { AnalysisProgress, type AnalysisState } from "@/components/analysis/AnalysisProgress";
+import { AnalysisProgress } from "@/components/analysis/AnalysisProgress";
 import { cn } from "@/lib/utils";
 import { ArrowLeft } from "lucide-react";
 import { ANALYSIS_RESULT_KEY } from "@/lib/analysis/constants";
 import { analyzePr } from "@/lib/analysis/request";
+import type { AnalysisSnapshot } from "@/types/analysis";
 
 /**
  * Example PR URL used for the guaranteed mock path.
@@ -22,6 +23,11 @@ function parsePrUrl(url: string): { repo: string; prNumber: number } | null {
   if (!match) return null;
   return { repo: match[1], prNumber: parseInt(match[2], 10) };
 }
+
+type AnalysisState =
+  | { type: "analyzing"; snapshot?: AnalysisSnapshot }
+  | { type: "success" }
+  | { type: "error"; message: string };
 
 export function AnalyzeContent() {
   const searchParams = useSearchParams();
@@ -51,7 +57,9 @@ export function AnalyzeContent() {
     // The example PR is guaranteed to use mock data — no API call.
     if (prUrl === EXAMPLE_PR_URL) {
       try {
-        const mockResult = await import("@/data/mock-report").then((m) => m.mockReport);
+        const mockResult = await import("@/data/mock-report").then(
+          (m) => m.mockReport
+        );
         sessionStorage.setItem(
           ANALYSIS_RESULT_KEY,
           JSON.stringify({
@@ -60,7 +68,8 @@ export function AnalyzeContent() {
             metadata: {
               source: "mock" as const,
               analyzedAt: new Date().toISOString(),
-              headSha: "0000000000000000000000000000000000000000",
+              headSha:
+                "0000000000000000000000000000000000000000",
             },
           })
         );
@@ -76,9 +85,13 @@ export function AnalyzeContent() {
       return;
     }
 
-    // Live analysis via the API route.
+    // Live analysis via the API route with streaming progress.
     try {
-      const result = await analyzePr(parsed.repo, parsed.prNumber);
+      const result = await analyzePr(parsed.repo, parsed.prNumber, {
+        onStage: (snapshot) => {
+          setAnalysisState({ type: "analyzing", snapshot });
+        },
+      });
       sessionStorage.setItem(ANALYSIS_RESULT_KEY, JSON.stringify(result));
       setAnalysisState({ type: "success" });
     } catch (err) {
@@ -108,7 +121,8 @@ export function AnalyzeContent() {
           </div>
           <h1 className="text-xl font-semibold">Missing pull request URL</h1>
           <p className="text-[#94A3B8]">
-            No PR URL was provided. Please start from the home page and enter a pull request URL to analyze.
+            No PR URL was provided. Please start from the home page and enter a
+            pull request URL to analyze.
           </p>
           <Link
             href="/"
