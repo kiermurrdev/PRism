@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { GitFork, ExternalLink } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -20,15 +21,14 @@ export function AppHeader() {
           aria-label="PRism home"
         >
           <div className="relative flex items-center justify-center w-8 h-8">
-            <div className="absolute inset-0 rounded-lg bg-gradient-to-br from-[#8B5CF6] to-[#22D3EE]" />
-            <svg
-              className="relative w-4 h-4 text-[#090D18]"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-              aria-hidden="true"
-            >
-              <path d="M12 2L3 22h18L12 2z" />
-            </svg>
+            <Image
+              src="/prism-logo.png"
+              alt=""
+              width={27}
+              height={32}
+              className="h-8 w-auto object-contain"
+              priority
+            />
           </div>
           <span className="text-lg font-semibold tracking-tight">
             PRism
