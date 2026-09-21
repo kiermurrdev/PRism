@@ -7,6 +7,7 @@ import { AnalysisProgress } from "@/components/analysis/AnalysisProgress";
 import { cn } from "@/lib/utils";
 import { ArrowLeft } from "lucide-react";
 import { ANALYSIS_RESULT_KEY } from "@/lib/analysis/constants";
+import { decodePrUrl } from "@/lib/analysis/analysis-link";
 import { analyzePr } from "@/lib/analysis/request";
 import type { AnalysisSnapshot } from "@/types/analysis";
 
@@ -32,7 +33,8 @@ type AnalysisState =
 export function AnalyzeContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const prUrl = searchParams.get("pr");
+  const encodedPrUrl = searchParams.get("pr");
+  const prUrl = decodePrUrl(encodedPrUrl);
 
   const [analysisState, setAnalysisState] = useState<AnalysisState>({
     type: "analyzing",
@@ -112,7 +114,7 @@ export function AnalyzeContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prUrl]);
 
-  if (!prUrl) {
+  if (!encodedPrUrl) {
     return (
       <div className="flex flex-col flex-1 items-center justify-center">
         <main className="flex flex-col items-center justify-center gap-6 py-32 px-8 max-w-xl text-center">
@@ -123,6 +125,32 @@ export function AnalyzeContent() {
           <p className="text-[#94A3B8]">
             No PR URL was provided. Please start from the home page and enter a
             pull request URL to analyze.
+          </p>
+          <Link
+            href="/"
+            className={cn(
+              "inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium",
+              "bg-gradient-to-r from-[#8B5CF6] to-[#22D3EE] text-[#090D18]",
+              "hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8B5CF6]",
+              "transition-opacity"
+            )}
+          >
+            <ArrowLeft className="w-4 h-4" aria-hidden="true" />
+            Return home
+          </Link>
+        </main>
+      </div>
+    );
+  }
+
+  if (!prUrl) {
+    return (
+      <div className="flex flex-col flex-1 items-center justify-center">
+        <main className="flex flex-col items-center justify-center gap-6 py-32 px-8 max-w-xl text-center">
+          <h1 className="text-xl font-semibold">Invalid pull request URL</h1>
+          <p className="text-[#94A3B8]">
+            The pull request link could not be decoded. Please return to the PR
+            and open the analysis link again.
           </p>
           <Link
             href="/"
