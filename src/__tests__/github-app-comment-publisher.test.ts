@@ -12,6 +12,7 @@ import {
   buildPrismComment,
   publishPrComment,
   type CommentPublisherConfig,
+  type PublishOptions,
   type PublishResult,
 } from "@/lib/github/app/comment-publisher";
 import type { Clock, JwtCrypto } from "@/lib/github/app/jwt";
@@ -26,6 +27,20 @@ const TEST_EVENT_DATA = {
   prNumber: 42,
   prTitle: "Test pull request",
   headSha: "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+  reportId: "test-report-123",
+};
+
+/**
+ * Default publish options built from TEST_EVENT_DATA.
+ */
+const TEST_EVENT: PublishOptions = {
+  ...TEST_EVENT_DATA,
+  config: {
+    appId: 12345,
+    privateKey: "[REDACTED PRIVATE KEY]",
+    appSlug: "prism",
+    appUrl: "https://prism.example.com",
+  },
 };
 
 /**
@@ -93,40 +108,38 @@ describe("comment-publisher", () => {
     it("builds a Markdown comment with PR context and analysis link", () => {
       const body = buildCommentBody(
         "Fix login bug",
-        "https://github.com/owner/repo/pull/10",
         "abcdef1234567890abcdef1234567890abcdef12",
         "https://prism.example.com",
+        "test-report-123",
       );
 
       assert.ok(body.includes("PRism Analysis"));
       assert.ok(body.includes("Fix login bug"));
       assert.ok(body.includes("abcdef1"));
-      assert.ok(body.includes("/analyze?pr="));
-      assert.ok(body.includes("Opening the link runs or refreshes the analysis"));
+      assert.ok(body.includes("/reports/test-report-123"));
     });
 
     it("uses the short SHA (first 7 chars)", () => {
       const body = buildCommentBody(
         "Test",
-        "https://github.com/owner/repo/pull/1",
         "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
         "https://prism.example.com",
+        "report-1",
       );
 
       assert.ok(body.includes("deadbee"));
       assert.ok(!body.includes("deadbeefdeadbeef"));
     });
 
-    it("encodes the PR URL in the analysis link", () => {
+    it("creates a report link with the given reportId", () => {
       const body = buildCommentBody(
         "Test",
-        "https://github.com/owner/repo/pull/1",
         "abc123",
         "https://prism.example.com",
+        "my-report",
       );
 
-      const encoded = btoa("https://github.com/owner/repo/pull/1");
-      assert.ok(body.includes(`/analyze?pr=${encoded}`));
+      assert.ok(body.includes("/reports/my-report"));
     });
   });
 
@@ -136,9 +149,9 @@ describe("comment-publisher", () => {
         "owner/repo",
         42,
         "Test PR",
-        "https://github.com/owner/repo/pull/42",
         "abc123def456",
         "https://prism.example.com",
+        "test-report",
       );
 
       assert.ok(comment.includes("<!-- PRISM_ANALYSIS_START:repo=owner/repo:pr=42:sha=abc123def456 -->"));
@@ -147,9 +160,9 @@ describe("comment-publisher", () => {
     });
 
     it("creates a unique marker per PR/SHA combination", () => {
-      const c1 = buildPrismComment("owner/repo", 42, "PR", "url", "sha1", "https://prism.example.com");
-      const c2 = buildPrismComment("owner/repo", 42, "PR", "url", "sha2", "https://prism.example.com");
-      const c3 = buildPrismComment("owner/repo", 43, "PR", "url", "sha1", "https://prism.example.com");
+      const c1 = buildPrismComment("owner/repo", 42, "PR", "sha1", "https://prism.example.com", "r1");
+      const c2 = buildPrismComment("owner/repo", 42, "PR", "sha2", "https://prism.example.com", "r2");
+      const c3 = buildPrismComment("owner/repo", 43, "PR", "sha1", "https://prism.example.com", "r3");
 
       assert.ok(c1.includes("sha=sha1"));
       assert.ok(c2.includes("sha=sha2"));
@@ -181,8 +194,7 @@ describe("comment-publisher", () => {
       ]);
 
       const result = await publishPrComment({
-        event: TEST_EVENT,
-        config: TEST_CONFIG,
+        ...TEST_EVENT,
         fetchFn,
         clock: FIXED_CLOCK,
         jwtCrypto: MOCK_JWT_CRYPTO,
@@ -222,8 +234,7 @@ describe("comment-publisher", () => {
       ]);
 
       const result = await publishPrComment({
-        event: TEST_EVENT,
-        config: TEST_CONFIG,
+        ...TEST_EVENT,
         fetchFn,
         clock: FIXED_CLOCK,
         jwtCrypto: MOCK_JWT_CRYPTO,
@@ -257,8 +268,7 @@ describe("comment-publisher", () => {
       ]);
 
       const result = await publishPrComment({
-        event: TEST_EVENT,
-        config: TEST_CONFIG,
+        ...TEST_EVENT,
         fetchFn,
         clock: FIXED_CLOCK,
         jwtCrypto: MOCK_JWT_CRYPTO,
@@ -298,8 +308,7 @@ describe("comment-publisher", () => {
       ]);
 
       const result = await publishPrComment({
-        event: TEST_EVENT,
-        config: TEST_CONFIG,
+        ...TEST_EVENT,
         fetchFn,
         clock: FIXED_CLOCK,
         jwtCrypto: MOCK_JWT_CRYPTO,
@@ -338,8 +347,7 @@ describe("comment-publisher", () => {
       ]);
 
       const result = await publishPrComment({
-        event: TEST_EVENT,
-        config: TEST_CONFIG,
+        ...TEST_EVENT,
         fetchFn,
         clock: FIXED_CLOCK,
         jwtCrypto: MOCK_JWT_CRYPTO,
@@ -378,8 +386,7 @@ describe("comment-publisher", () => {
       ]);
 
       const result = await publishPrComment({
-        event: TEST_EVENT,
-        config: TEST_CONFIG,
+        ...TEST_EVENT,
         fetchFn,
         clock: FIXED_CLOCK,
         jwtCrypto: MOCK_JWT_CRYPTO,
@@ -401,8 +408,7 @@ describe("comment-publisher", () => {
       ]);
 
       const result = await publishPrComment({
-        event: TEST_EVENT,
-        config: TEST_CONFIG,
+        ...TEST_EVENT,
         fetchFn,
         clock: FIXED_CLOCK,
         jwtCrypto: MOCK_JWT_CRYPTO,
@@ -423,8 +429,7 @@ describe("comment-publisher", () => {
       ]);
 
       const result = await publishPrComment({
-        event: TEST_EVENT,
-        config: TEST_CONFIG,
+        ...TEST_EVENT,
         fetchFn,
         clock: FIXED_CLOCK,
         jwtCrypto: MOCK_JWT_CRYPTO,
@@ -451,8 +456,7 @@ describe("comment-publisher", () => {
       ]);
 
       const result = await publishPrComment({
-        event: TEST_EVENT,
-        config: TEST_CONFIG,
+        ...TEST_EVENT,
         fetchFn,
         clock: FIXED_CLOCK,
         jwtCrypto: MOCK_JWT_CRYPTO,
@@ -486,8 +490,7 @@ describe("comment-publisher", () => {
       ]);
 
       const result = await publishPrComment({
-        event: TEST_EVENT,
-        config: TEST_CONFIG,
+        ...TEST_EVENT,
         fetchFn,
         clock: FIXED_CLOCK,
         jwtCrypto: MOCK_JWT_CRYPTO,
@@ -503,8 +506,7 @@ describe("comment-publisher", () => {
       };
 
       const result = await publishPrComment({
-        event: TEST_EVENT,
-        config: TEST_CONFIG,
+        ...TEST_EVENT,
         fetchFn,
         clock: FIXED_CLOCK,
         jwtCrypto: MOCK_JWT_CRYPTO,
@@ -518,11 +520,8 @@ describe("comment-publisher", () => {
       const fetchFn: FetchFn = async () => new Response("{}");
 
       const result = await publishPrComment({
-        event: {
-          ...TEST_EVENT,
-          installationId: 0,
-        },
-        config: TEST_CONFIG,
+        ...TEST_EVENT,
+        installationId: 0,
         fetchFn,
         clock: FIXED_CLOCK,
         jwtCrypto: MOCK_JWT_CRYPTO,
@@ -538,7 +537,7 @@ describe("comment-publisher", () => {
       const fetchFn: FetchFn = async () => new Response(JSON.stringify({}), { status: 200 });
 
       const result = await publishPrComment({
-        event: TEST_EVENT,
+        ...TEST_EVENT,
         config: {
           ...TEST_CONFIG,
           privateKey: "SUPER_SECRET_KEY_MATERIAL",
@@ -569,8 +568,7 @@ describe("comment-publisher", () => {
       ]);
 
       const result = await publishPrComment({
-        event: TEST_EVENT,
-        config: TEST_CONFIG,
+        ...TEST_EVENT,
         fetchFn,
         clock: FIXED_CLOCK,
         jwtCrypto: MOCK_JWT_CRYPTO,
@@ -589,9 +587,8 @@ describe("comment-publisher", () => {
         user: { login: "prism[bot]", type: "Bot" },
       };
 
-      const syncEvent: NormalizedWebhookEvent = {
+      const syncEvent: PublishOptions = {
         ...TEST_EVENT,
-        action: "synchronize",
         headSha: "newsha1234567890abcdef1234567890abcdef",
       };
 
@@ -617,8 +614,7 @@ describe("comment-publisher", () => {
       ]);
 
       const result = await publishPrComment({
-        event: syncEvent,
-        config: TEST_CONFIG,
+        ...syncEvent,
         fetchFn,
         clock: FIXED_CLOCK,
         jwtCrypto: MOCK_JWT_CRYPTO,
@@ -629,9 +625,8 @@ describe("comment-publisher", () => {
     });
 
     it("creates comment on reopened event when none exists", async () => {
-      const reopenedEvent: NormalizedWebhookEvent = {
+      const reopenedEvent: PublishOptions = {
         ...TEST_EVENT,
-        action: "reopened",
       };
 
       const fetchFn = mockFetch([
@@ -656,8 +651,7 @@ describe("comment-publisher", () => {
       ]);
 
       const result = await publishPrComment({
-        event: reopenedEvent,
-        config: TEST_CONFIG,
+        ...reopenedEvent,
         fetchFn,
         clock: FIXED_CLOCK,
         jwtCrypto: MOCK_JWT_CRYPTO,
@@ -704,8 +698,7 @@ describe("comment-publisher", () => {
       // Call publishPrComment multiple times — only updates should occur
       for (let i = 0; i < 3; i++) {
         const result = await publishPrComment({
-          event: TEST_EVENT,
-          config: TEST_CONFIG,
+          ...TEST_EVENT,
           fetchFn,
           clock: FIXED_CLOCK,
           jwtCrypto: MOCK_JWT_CRYPTO,

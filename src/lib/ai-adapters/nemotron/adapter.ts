@@ -11,7 +11,7 @@ import {
   AnalysisContext,
   AdapterOptions,
   AdapterCapabilities,
-} from "./adapter";
+} from "../adapter";
 import { buildPrompt } from "./prompt";
 import { ReportDataSchema } from "@/lib/analysis/schema";
 import {
@@ -257,7 +257,7 @@ export class NemotronAdapter implements AiProviderAdapter {
     // Use JSON mode on second attempt (repair)
     if (attempt > 0) {
       body.response_format = { type: "json_object" };
-      body.messages[0].content =
+      (body.messages as Array<{ role: string; content: string }>)[0].content =
         "Return ONLY valid JSON matching the ReportData schema. No markdown, no explanation.";
     }
 

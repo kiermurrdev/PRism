@@ -6,7 +6,7 @@
  */
 
 import { NemotronAdapter } from "@/lib/ai-adapters/nemotron";
-import type { NemotronContext, NemotronResult, NemotronOptions } from "./types";
+import type { NemotronContext, NemotronResult, NemotronOptions, NemotronErrorCode } from "./types";
 import type { AdapterOptions } from "@/lib/ai-adapters/adapter";
 
 export { MAX_REPAIR_ATTEMPTS } from "@/lib/ai-adapters/nemotron/constants";
@@ -40,7 +40,7 @@ export async function analyzeWithNemotron(
   options?: NemotronOptions
 ): Promise<NemotronResult> {
   const adapter = new NemotronAdapter();
-  const adapterOptions: AdapterOptions = options
+  const adapterOptions: AdapterOptions | undefined = options
     ? { timeoutMs: options.timeoutMs }
     : undefined;
 
@@ -50,5 +50,5 @@ export async function analyzeWithNemotron(
     return { ok: true, report: result.report };
   }
 
-  return { ok: false, error: result.error };
+  return { ok: false, error: { code: result.error.code as NemotronErrorCode, message: result.error.message } };
 }
