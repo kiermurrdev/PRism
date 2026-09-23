@@ -14,21 +14,16 @@ import {
   type CommentPublisherConfig,
   type PublishResult,
 } from "@/lib/github/app/comment-publisher";
-import type { NormalizedWebhookEvent } from "@/lib/github/app/contracts";
 import type { Clock, JwtCrypto } from "@/lib/github/app/jwt";
 import type { FetchFn } from "@/lib/github/app/token";
 
 /**
- * A test webhook event.
+ * A test webhook event data.
  */
-const TEST_EVENT: NormalizedWebhookEvent = {
-  type: "pull_request",
-  action: "opened",
-  deliveryId: "test-delivery-123",
+const TEST_EVENT_DATA = {
   installationId: 99999,
   repositoryFullName: "test-owner/test-repo",
   prNumber: 42,
-  prUrl: "https://github.com/test-owner/test-repo/pull/42",
   prTitle: "Test pull request",
   headSha: "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
 };

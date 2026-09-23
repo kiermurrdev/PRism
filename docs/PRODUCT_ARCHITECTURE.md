@@ -584,9 +584,150 @@ If Trigger.dev is used:
 - GitHub App installation flow remains unchanged from the prototype.
 - Users are responsible for providing their own AI provider credentials.
 
-## 18. Deferred Items
+## 18. Observability
 
-- Rate limiting and abuse prevention (to be defined in a later issue).
+### 18.1 Structured Logging
+
+All server-side operations emit structured JSON logs with:
+
+- `level`: info, warn, error, debug
+- `timestamp`: ISO 8601
+- `correlationId`: UUID to trace a request across components
+- `message`: Human-readable description
+- Additional context fields as needed
+
+### 18.2 Correlation IDs
+
+- Every incoming request generates a correlation ID.
+- The ID is passed through to workers and database operations.
+- Logs are queryable by correlation ID for incident investigation.
+
+### 18.3 Redaction
+
+Logs never contain:
+
+- API keys, tokens, or passwords
+- GitHub App private keys
+- Repository content or diff text
+- User credentials or PII
+
+Sensitive fields are automatically redacted by pattern matching on keys and values.
+
+### 18.4 Job Timing
+
+Analysis jobs log duration for each phase:
+
+- `ingestion_duration_ms`: Time to fetch PR data from GitHub
+- `analysis_duration_ms`: Time for AI analysis
+- `total_duration_ms`: End-to-end job duration
+
+These metrics support performance monitoring and capacity planning.
+
+### 18.5 Error Classification
+
+Errors are classified for alerting:
+
+- `provider_error`: AI provider API failure (rate limit, timeout, auth)
+- `github_error`: GitHub API failure (rate limit, auth, network)
+- `database_error`: PostgreSQL connection or query failure
+- `validation_error`: Input or schema validation failure
+- `internal_error`: Unexpected application error
+
+### 18.6 Health Checks
+
+- `GET /api/health`: Basic liveness check (returns 200 when running)
+- `GET /api/health?checkDb=true`: Readiness check including database connectivity
+
+Configure load balancers and orchestrators to poll these endpoints.
+
+## 19. Rate Limiting and Abuse Prevention
+
+### 19.1 Rate Limits
+
+| Endpoint | Limit | Window |
+|----------|-------|--------|
+| Sign-in | 5 requests | 15 minutes |
+| Credential test | 5 requests | 5 minutes |
+| Manual job start | 10 requests | 5 minutes |
+| Webhook receiver | 100 requests | 1 minute |
+| Job retry | 5 requests | 5 minutes |
+| Report access | 100 requests | 1 minute |
+
+### 19.2 Implementation
+
+- In-memory sliding window with Redis-compatible key format.
+- Returns 429 Too Many Requests with `Retry-After` header.
+- Per-user and per-IP enforcement for user-facing endpoints.
+- Per-installation enforcement for webhook endpoints.
+
+### 19.3 Abuse Controls
+
+- Failed sign-in attempts are rate limited and logged.
+- Credential test failures are rate limited to prevent credential stuffing.
+- Webhook signatures are verified; invalid signatures are rejected.
+- Unauthenticated access to protected routes returns 401.
+
+## 20. Retention and Deletion
+
+### 20.1 Data Retention
+
+| Entity | Retention | Deletion Trigger |
+|--------|-----------|------------------|
+| Users | Indefinite | Account deletion request |
+| Credentials | Indefinite | User deletion or explicit removal |
+| Installations | Indefinite | GitHub uninstallation webhook |
+| Repositories | Indefinite | Installation deletion |
+| Jobs | Indefinite | User deletion or explicit removal |
+| Reports | Indefinite | Job deletion or explicit removal |
+
+### 20.2 Cascade Deletion
+
+- **User deletion**: Removes user's credentials; jobs/reports owned by user's account are anonymized or deleted based on account ownership.
+- **Installation deletion**: Removes installation, repositories, jobs, reports, and comments associated with that installation.
+- **Credential deletion**: Removes the credential; does not affect existing jobs or reports (they reference the credential id but are self-contained).
+
+### 20.3 Implementation
+
+Soft deletion is used where recovery may be needed:
+
+- `deleted_at` timestamp on affected tables.
+- Soft-deleted records are excluded from normal queries.
+- Periodic cleanup job can permanently delete old soft-deleted records.
+
+## 21. Feature Flags
+
+Feature flags enable gradual rollout and rollback without redeployment.
+
+### 21.1 Flags
+
+| Flag | Default | Purpose |
+|------|---------|---------|
+| `FEATURE_NEW_JOB_FLOW` | true | Use durable job-based analysis instead of synchronous |
+| `FEATURE_NEW_DASHBOARD` | true | New multi-tenant dashboard UI |
+| `FEATURE_CREDENTIAL_MANAGEMENT` | true | BYOK credential management page |
+| `FEATURE_WEBHOOK_ANALYSIS` | true | Webhook-triggered analysis jobs |
+| `FEATURE_NEW_REPORT_VIEWER` | true | New report viewer with stable URLs |
+
+### 21.2 Configuration
+
+Flags are configured via environment variables:
+
+```
+FEATURE_NEW_JOB_FLOW=true
+FEATURE_NEW_DASHBOARD=true
+FEATURE_CREDENTIAL_MANAGEMENT=true
+FEATURE_WEBHOOK_ANALYSIS=true
+FEATURE_NEW_REPORT_VIEWER=true
+```
+
+Set to `false` to disable a feature. Flags are cached on first load; call `resetFeatureFlags()` to refresh.
+
+### 21.3 Legacy Behavior
+
+When `FEATURE_NEW_JOB_FLOW=false`, the system falls back to the original synchronous analysis flow. This allows rollback without code changes.
+
+## 22. Deferred Items
+
 - Multi-region deployment strategy (out of scope for initial platform).
 - Webhook delivery reliability beyond GitHub's retry mechanism.
 - Report versioning and diffing across commits (future enhancement).
