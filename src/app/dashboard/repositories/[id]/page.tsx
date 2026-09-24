@@ -196,7 +196,7 @@ export default function RepositorySettingsPage() {
               Required for code analysis. Leave blank to use default credentials.
             </p>
             <Link
-              href="/dashboard/credentials"
+              href="/dashboard/connections"
               className="text-xs text-blue-600 hover:text-blue-800 mt-1 inline-block"
             >
               Manage credentials →

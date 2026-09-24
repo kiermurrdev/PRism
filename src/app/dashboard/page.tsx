@@ -302,13 +302,20 @@ export default function DashboardPage() {
       {/* Quick Links */}
       <div>
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Links</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Link
             href="/dashboard/repositories"
             className="bg-white rounded-lg shadow-sm p-4 border border-gray-200 hover:border-blue-300 transition-colors"
           >
             <div className="font-medium text-gray-900">Manage Repositories</div>
             <div className="text-sm text-gray-500 mt-1">Configure credentials and review settings</div>
+          </Link>
+          <Link
+            href="/dashboard/connections"
+            className="bg-white rounded-lg shadow-sm p-4 border border-gray-200 hover:border-blue-300 transition-colors"
+          >
+            <div className="font-medium text-gray-900">Connections</div>
+            <div className="text-sm text-gray-500 mt-1">Manage your AI provider connections</div>
           </Link>
           <Link
             href="/dashboard/jobs"

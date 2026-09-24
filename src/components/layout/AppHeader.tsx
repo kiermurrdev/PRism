@@ -58,6 +58,20 @@ export function AppHeader() {
 
         {/* Right-side links */}
         <nav className="flex items-center gap-1" aria-label="Primary navigation">
+          {/* Dashboard link (authenticated only) */}
+          {!isLoading && session && (
+            <Link
+              href="/dashboard"
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm",
+                "text-[#F8FAFC] hover:bg-[#111827] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8B5CF6]",
+                "transition-colors"
+              )}
+            >
+              <span className="hidden sm:inline">Dashboard</span>
+            </Link>
+          )}
+
           {/* View example link */}
           <Link
             href="/report/demo"

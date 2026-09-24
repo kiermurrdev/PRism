@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 const PUBLIC_PATHS = ["/", "/auth/signin", "/auth/error", "/api/auth", "/api/health"];
-const PROTECTED_PREFIXES = ["/analyze", "/report", "/settings", "/api/github-webhooks"];
+const PROTECTED_PREFIXES = ["/analyze", "/report", "/settings", "/dashboard", "/api/github-webhooks"];
 
 function isPublic(pathname: string): boolean {
   if (PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"))) return true;
