@@ -71,8 +71,13 @@ export interface NemotronContext {
   repoContext?: string;
 }
 
+export interface NemotronOptions {
+  timeoutMs?: number;
+}
+
 /**
  * Configuration options for the Nemotron client.
+ * @deprecated Use NemotronOptions instead.
  */
 export interface NemotronClientOptions {
   /**

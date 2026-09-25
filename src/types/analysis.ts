@@ -36,7 +36,7 @@ export interface AnalysisRequest {
  * Intermediate snapshot emitted while analysis is in progress.
  */
 export interface AnalysisSnapshot {
-  status: "fetching" | "analyzing" | "generating";
+  stage: string;
   message: string;
 }
 
