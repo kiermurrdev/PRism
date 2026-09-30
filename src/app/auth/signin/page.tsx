@@ -1,4 +1,12 @@
+"use client";
+
+import Image from "next/image";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
+import "./signin.css";
+import BrandedNav from "@/components/landing/BrandedNav";
+import ReferenceField from "@/components/landing/ReferenceField";
 
 function GitHubIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
@@ -13,44 +21,68 @@ function GitHubIcon(props: React.SVGProps<SVGSVGElement>) {
   );
 }
 
-export default function SignInPage() {
+function SignInCard() {
+  const params = useSearchParams();
+  const callbackUrl = params.get("callbackUrl") || "/credentials";
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center gap-6 px-4">
-      <div className="flex flex-col items-center gap-4">
-        <div className="relative flex items-center justify-center w-12 h-12">
-          <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-[#8B5CF6] to-[#22D3EE]" />
-          <svg
-            className="relative w-6 h-6 text-[#090D18]"
-            viewBox="0 0 24 24"
-            fill="currentColor"
-          >
-            <path d="M12 2L3 22h18L12 2z" />
-          </svg>
-        </div>
-        <h1 className="text-2xl font-semibold tracking-tight">Sign in to PRism</h1>
-        <p className="text-[#94A3B8] text-sm text-center max-w-[320px]">
-          Use your GitHub account to sign in. Your credentials are stored encrypted
-          and never shared with third parties.
-        </p>
+    <div className="glass sign-in-card">
+      <div className="sign-in-logo">
+        <Image
+          src="/prism-logo.png"
+          alt=""
+          width={48}
+          height={58}
+        />
+        <span>PRism</span>
       </div>
+
+      <h1 className="sign-in-title">Sign in to PRism</h1>
+
+      <p className="sign-in-sub">
+        Use your GitHub account to sign in. Your credentials are stored
+        encrypted and never shared with third parties.
+      </p>
 
       <form
         action="/api/auth/signin/github"
         method="post"
-        className="flex flex-col items-center gap-3"
+        className="sign-in-form"
       >
+        <input
+          type="hidden"
+          name="callbackUrl"
+          value={callbackUrl}
+        />
         <button
           type="submit"
-          className="inline-flex items-center gap-2 rounded-md px-5 py-2.5 bg-[#8B5CF6] text-white font-medium text-sm hover:bg-[#7C3AED] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8B5CF6]"
+          className="sign-in-btn"
         >
-          <GitHubIcon className="w-4 h-4" />
+          <GitHubIcon className="w-5 h-5" />
           Sign in with GitHub
         </button>
       </form>
 
-      <Link href="/" className="text-[#94A3B8] text-sm hover:text-[#F8FAFC]">
-        &larr; Back to home
+      <Link href="/" className="sign-in-back">
+        ← Back to home
       </Link>
+    </div>
+  );
+}
+
+export default function SignInPage() {
+  return (
+    <div className="lp">
+      <ReferenceField />
+      <div id="page">
+        <BrandedNav />
+
+        <div className="wrap hero">
+          <Suspense fallback={null}>
+            <SignInCard />
+          </Suspense>
+        </div>
+      </div>
     </div>
   );
 }

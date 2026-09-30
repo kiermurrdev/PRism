@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { authFetch } from "@/lib/auth-fetch";
 import "./credentials.css";
-import SiteNav from "@/components/landing/SiteNav";
+import BrandedNav from "@/components/landing/BrandedNav";
 import ReferenceField from "@/components/landing/ReferenceField";
 
 type Credential = {
@@ -205,7 +205,7 @@ export default function CredentialsPage() {
     <div className="lp">
       <ReferenceField />
       <div id="page">
-        <SiteNav />
+        <BrandedNav />
 
         <main id="top">
           <div className="wrap hero">

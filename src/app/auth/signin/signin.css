@@ -1,0 +1,138 @@
+/* Sign-in page — reuses landing page design tokens via .lp namespace */
+
+@import "../../landing.css";
+
+/* Center the sign-in card within the hero area */
+.lp .hero:has(.sign-in-card) {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding-block: clamp(72px, 12vh, 140px) clamp(30px, 4vh, 46px);
+  min-height: 100vh;
+}
+
+/* Glass card — uses the same glass treatment as landing .glass */
+.lp .sign-in-card {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  padding: clamp(24px, 3vw, 32px);
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(165%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(165%);
+  border: 1px solid var(--glass-line);
+  box-shadow: inset 0 1px 0 var(--glass-sheen), var(--glass-shadow);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(10px, 1.2vh, 14px);
+  text-align: center;
+}
+
+/* Sheen overlay (matches landing .glass::before) */
+.lp .sign-in-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(180deg, var(--glass-line-soft), transparent 42%);
+}
+
+/* Content sits above sheen */
+.lp .sign-in-card > * {
+  position: relative;
+}
+
+/* Logo row */
+.lp .sign-in-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.lp .sign-in-logo img {
+  height: 40px;
+  width: auto;
+}
+
+.lp .sign-in-logo span {
+  font-size: 20px;
+  font-weight: 500;
+  letter-spacing: -0.018em;
+  color: var(--text-primary);
+}
+
+/* Title */
+.lp .sign-in-title {
+  font-size: clamp(20px, 2.2vw, 24px);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  color: var(--text-primary);
+}
+
+/* Subtitle */
+.lp .sign-in-sub {
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.55;
+  max-width: 38ch;
+}
+
+/* Form */
+.lp .sign-in-form {
+  width: 100%;
+  margin-top: 4px;
+}
+
+/* Primary button — cyan-accented, matches landing .cta */
+.lp .sign-in-btn {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 11px 18px;
+  border-radius: 10px;
+  border: none;
+  background: var(--accent-cyan);
+  color: #06111B;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #FFFFFF 42%, transparent),
+              0 8px 22px -12px color-mix(in srgb, var(--accent-cyan) 55%, transparent);
+  transition: background 0.25s var(--ease), transform 0.3s var(--ease);
+}
+
+.lp .sign-in-btn:hover {
+  background: color-mix(in srgb, var(--accent-cyan) 86%, #FFFFFF);
+}
+
+.lp .sign-in-btn:active {
+  transform: translateY(1px);
+}
+
+.lp .sign-in-btn:focus-visible {
+  outline: none;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #FFFFFF 42%, transparent),
+              0 8px 22px -12px color-mix(in srgb, var(--accent-cyan) 55%, transparent),
+              0 0 0 3px color-mix(in srgb, var(--accent-cyan) 30%, transparent);
+}
+
+/* Back link */
+.lp .sign-in-back {
+  color: var(--text-muted);
+  font-size: 13px;
+  text-decoration: none;
+  transition: color 0.25s var(--ease);
+}
+
+.lp .sign-in-back:hover {
+  color: var(--text-primary);
+}
