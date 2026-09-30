@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { AnalyzeContent } from "./AnalyzeContent";
+import AnalyzeContent from "./AnalyzeContent";
 
 export default function AnalyzePage() {
   return (

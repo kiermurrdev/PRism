@@ -85,6 +85,9 @@ export default function SiteNav() {
             <a className="nav-link" href="https://github.com/kiermurrdev/PRism">
               GitHub
             </a>
+            <a className="nav-link" href="/credentials">
+              Connections
+            </a>
             <ConnectGitHub />
             <button className="nav-primary" type="button" onClick={focusInput}>
               Analyze a PR

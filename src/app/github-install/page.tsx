@@ -1,163 +1,104 @@
 /**
- * GET /github-install
+ * Authenticated GitHub App installation page.
  *
- * GitHub App installation callback page.
+ * Requires a signed-in user, generates a signed state token, and redirects
+ * to GitHub's installation page. On callback, the user is redirected to
+ * /api/github-install/callback where the installation is linked to their account.
  *
- * Handles the redirect from GitHub after the user installs/uninstalls/updates
- * the PRism app. This page is honest about what it knows: it confirms the
- * installation callback was received, but does not claim webhook success
- * without verification.
+ * This replaces the hackathon installation page that did not require auth.
  */
 
-import Link from "next/link";
-import { parseInstallationCallback } from "@/lib/github/app/installation";
+"use client";
 
-interface Props {
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
-}
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useSession, signIn } from "next-auth/react";
+import {
+  buildInstallationUrl,
+  getGitHubAppSlug,
+} from "@/lib/github/app/installation";
 
-export default async function GitHubInstallPage({ searchParams }: Props) {
-  const resolved = await searchParams;
-  const params = new URLSearchParams();
-  for (const [key, value] of Object.entries(resolved)) {
-    if (typeof value === "string") {
-      params.set(key, value);
+export default function GitHubInstallPage() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (status === "loading") return;
+
+    if (status === "unauthenticated") {
+      // Redirect to sign in, then back to this page
+      signIn("github", {
+        callbackUrl: "/github-install",
+      });
+      return;
     }
-  }
-  const result = parseInstallationCallback(params);
 
-  if (!result.ok) {
-    return <InvalidCallback reason={result.reason ?? "Unknown error."} />;
-  }
+    const appSlug = getGitHubAppSlug();
+    if (!appSlug) {
+      setError("GitHub App is not configured. Contact your administrator.");
+      return;
+    }
 
-  if (result.setupAction === "installed") {
-    return <InstalledSuccess installationId={result.installationId ?? 0} />;
-  }
+    // Redirect to the server-side handler that generates the signed state
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? window.location.origin;
+    const callbackUrl = `${appUrl}/api/github-install/callback`;
 
-  if (result.setupAction === "uninstalled") {
-    return <UninstalledNotice />;
-  }
+    // Use the server endpoint to get a signed state token
+    fetch("/api/github-install/link")
+      .then((res) => {
+        if (!res.ok) {
+          return res.json().then((data) => {
+            throw new Error(data.message ?? "Failed to initialize installation");
+          });
+        }
+        return res.json();
+      })
+      .then((data) => {
+        const installationUrl = buildInstallationUrl({
+          appSlug,
+          redirectUrl: `${callbackUrl}?state=${encodeURIComponent(data.stateToken)}`,
+        });
+        window.location.href = installationUrl;
+      })
+      .catch((err) => {
+        setError(err.message);
+      });
+  }, [status, router]);
 
-  if (result.setupAction === "updated") {
-    return <UpdatedSuccess installationId={result.installationId ?? 0} />;
-  }
-
-  return <InvalidCallback reason="Unknown installation action." />;
-}
-
-function InstalledSuccess({ installationId }: { installationId: number }) {
-  return (
-    <div className="github-install">
-      <div className="github-install-content">
-        <div className="github-install-icon" aria-hidden="true">&#10003;</div>
-        <h1>PRism installed</h1>
-        <p className="github-install-message">
-          PRism is now installed on your account (installation #{installationId}).
-        </p>
-        <div className="github-install-details" role="status" aria-live="polite">
-          <p>
-            <strong>What happens next:</strong>
-          </p>
-          <ul>
-            <li>
-              When you open a pull request on a repository where PRism is installed,
-              PRism will automatically post a comment with an analysis link.
-            </li>
-            <li>
-              Opening the analysis link runs the architectural impact report.
-            </li>
-          </ul>
-          <p className="github-install-note">
-            We have received your installation confirmation. Webhook delivery will be
-            verified automatically when the first pull request event arrives.
-          </p>
-        </div>
-        <div className="github-install-actions">
-          <Link href="/analyze" className="github-install-btn">
-            Analyze a PR now
-          </Link>
-          <Link href="/" className="github-install-link">
-            Return to homepage
-          </Link>
+  if (status === "loading") {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-center">
+          <div className="mb-4 h-8 w-8 animate-spin rounded-full border-4 border-gray-300 border-t-primary"></div>
+          <p className="text-gray-600">Initializing installation...</p>
         </div>
       </div>
-    </div>
-  );
-}
+    );
+  }
 
-function UpdatedSuccess({ installationId }: { installationId: number }) {
-  return (
-    <div className="github-install">
-      <div className="github-install-content">
-        <div className="github-install-icon" aria-hidden="true">&#8635;</div>
-        <h1>PRism updated</h1>
-        <p className="github-install-message">
-          Your PRism installation has been updated (installation #{installationId}).
-        </p>
-        <p className="github-install-note">
-          Existing repositories remain configured. Webhook delivery will be
-          verified automatically when the next pull request event arrives.
-        </p>
-        <div className="github-install-actions">
-          <Link href="/analyze" className="github-install-btn">
-            Analyze a PR now
-          </Link>
-          <Link href="/" className="github-install-link">
-            Return to homepage
-          </Link>
+  if (error) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="max-w-md rounded-lg border border-red-200 bg-white p-6 shadow-sm">
+          <h1 className="mb-2 text-xl font-semibold text-red-700">Installation Error</h1>
+          <p className="mb-4 text-gray-600">{error}</p>
+          <button
+            onClick={() => router.push("/")}
+            className="rounded-md bg-gray-100 px-4 py-2 text-sm text-gray-700 hover:bg-gray-200"
+          >
+            Return Home
+          </button>
         </div>
       </div>
-    </div>
-  );
-}
+    );
+  }
 
-function UninstalledNotice() {
   return (
-    <div className="github-install">
-      <div className="github-install-content">
-        <div className="github-install-icon github-install-icon-warn" aria-hidden="true">&#9888;</div>
-        <h1>PRism uninstalled</h1>
-        <p className="github-install-message">
-          PRism has been uninstalled from your account.
-        </p>
-        <p className="github-install-note">
-          You can still use PRism to analyze public pull requests manually.
-          Automatic webhook-based analysis requires the app to be installed.
-        </p>
-        <div className="github-install-actions">
-          <Link href="/analyze" className="github-install-btn">
-            Analyze a PR manually
-          </Link>
-          <Link href="/" className="github-install-link">
-            Return to homepage
-          </Link>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function InvalidCallback({ reason }: { reason: string }) {
-  return (
-    <div className="github-install">
-      <div className="github-install-content">
-        <div className="github-install-icon github-install-icon-error" aria-hidden="true">&#10008;</div>
-        <h1>Installation callback error</h1>
-        <p className="github-install-message">
-          We could not verify your installation status.
-        </p>
-        <p className="github-install-error" role="alert">
-          {reason}
-        </p>
-        <p className="github-install-note">
-          If you recently installed PRism, try installing again from the
-          homepage. If the problem persists, contact support.
-        </p>
-        <div className="github-install-actions">
-          <Link href="/" className="github-install-btn">
-            Return to homepage
-          </Link>
-        </div>
+    <div className="flex min-h-screen items-center justify-center">
+      <div className="text-center">
+        <div className="mb-4 h-8 w-8 animate-spin rounded-full border-4 border-gray-300 border-t-primary"></div>
+        <p className="text-gray-600">Redirecting to GitHub...</p>
       </div>
     </div>
   );

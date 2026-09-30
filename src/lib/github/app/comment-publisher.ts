@@ -8,11 +8,10 @@
  * SERVER-ONLY. Do not import this module into client-side code. Includes temporary API diagnostics.
  */
 
-import type { NormalizedWebhookEvent, PRCommentMarker } from "./contracts";
+import type { PRCommentMarker } from "./contracts";
 import { buildMarkerBlock } from "./markers";
 import { createJwt, type JwtConfig, type Clock, type JwtCrypto } from "./jwt";
 import { getInstallationAccessToken, type FetchFn } from "./token";
-import { buildAnalysisLink } from "@/lib/analysis/analysis-link";
 
 /**
  * GitHub API base URL.
@@ -86,12 +85,11 @@ interface GitHubAppUser {
  */
 export function buildCommentBody(
   prTitle: string,
-  prUrl: string,
   headSha: string,
   appUrl: string,
+  reportId: string,
 ): string {
-  const analysisPath = buildAnalysisLink(prUrl);
-  const analysisLink = new URL(analysisPath, appUrl).toString();
+  const reportLink = new URL(`/reports/${reportId}`, appUrl).toString();
   const shortSha = headSha.slice(0, 7);
 
   return `# PRism Analysis
@@ -101,9 +99,7 @@ Review the architectural impact of this PR.
 **PR:** ${prTitle}
 **Head SHA:** \`${shortSha}\`
 
-[View analysis report](${analysisLink})
-
-> Opening the link runs or refreshes the analysis for this PR.
+[View analysis report](${reportLink})
 `;
 }
 
@@ -114,11 +110,11 @@ export function buildPrismComment(
   repo: string,
   prNumber: number,
   prTitle: string,
-  prUrl: string,
   headSha: string,
   appUrl: string,
+  reportId: string,
 ): string {
-  const body = buildCommentBody(prTitle, prUrl, headSha, appUrl);
+  const body = buildCommentBody(prTitle, headSha, appUrl, reportId);
   return buildMarkerBlock(repo, prNumber, headSha, body);
 }
 
@@ -199,8 +195,18 @@ function findPrismComment(
  * Options for publishing a comment.
  */
 export interface PublishOptions {
-  /** The webhook event that triggered publishing. */
-  event: NormalizedWebhookEvent;
+  /** Repository full name (owner/repo). */
+  repositoryFullName: string;
+  /** PR number. */
+  prNumber: number;
+  /** PR title. */
+  prTitle: string;
+  /** Head SHA at analysis time. */
+  headSha: string;
+  /** Installation ID for GitHub App auth. */
+  installationId: number;
+  /** Report ID to link to in the comment. */
+  reportId: string;
   /** Publisher configuration. */
   config: CommentPublisherConfig;
   /** Fetch implementation for testing. */
@@ -220,14 +226,13 @@ export interface PublishOptions {
  * 3. Finds the existing PRism comment by marker and bot ownership.
  * 4. Creates or updates the comment idempotently.
  *
- * The webhook never waits for Nemotron analysis — the comment links to
- * the analysis page which runs/refreshes analysis on open.
+ * The comment links to a stable report URL (/reports/:reportId) that is
+ * created during the analysis pipeline run.
  */
 export async function publishPrComment(options: PublishOptions): Promise<PublishResult> {
-  const { event, config, fetchFn, clock, jwtCrypto } = options;
+  const { repositoryFullName, prNumber, prTitle, headSha, installationId, reportId, config, fetchFn, clock, jwtCrypto } = options;
   const effectiveFetch: FetchFn = fetchFn ?? globalThis.fetch;
   const { appId, privateKey, appSlug, appUrl } = config;
-  const { installationId, repositoryFullName, prNumber, prUrl, prTitle, headSha } = event;
 
   // Step 1: Generate JWT
   const jwtConfig: JwtConfig = { appId, privateKey };
@@ -306,9 +311,9 @@ export async function publishPrComment(options: PublishOptions): Promise<Publish
     repositoryFullName,
     prNumber,
     prTitle,
-    prUrl,
     headSha,
     appUrl,
+    reportId,
   );
 
   // Check if the existing comment already has the same SHA — no-op

@@ -1,14 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ExternalLink, ArrowLeft } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { loadAnalysisResult } from "@/lib/analysis/load-result";
 import type { ReportNode } from "@/types/report";
-import type { AnalysisResult } from "@/types/analysis";
-import type { LoadResultError } from "@/lib/analysis/load-result";
 import ImpactGraph from "@/components/report/ImpactGraph";
 import ChangeSummaryCard from "@/components/report/ChangeSummaryCard";
 import ImpactFindings from "@/components/report/ImpactFindings";
@@ -18,20 +15,101 @@ import NodeDetailsPanel from "@/components/report/NodeDetailsPanel";
 import ImpactLegend from "@/components/report/ImpactLegend";
 import ReportActions from "@/components/report/ReportActions";
 
-type LoadedResult = { result: AnalysisResult } | { error: LoadResultError };
+interface PersistedReport {
+  id: string;
+  headSha: string;
+  provider: string | null;
+  model: string | null;
+  analyzedAt: string;
+  title: string;
+  prUrl: string;
+  summary: string;
+  nodes: ReportNode[];
+  edges: { id: string; source: string; target: string }[];
+  findings: {
+    id: string;
+    severity: "high" | "medium" | "low";
+    title: string;
+    description: string;
+    affectedNodes: string[];
+  }[];
+  qaItems: { id: string; description: string; checked: boolean }[];
+  affectedFiles: {
+    path: string;
+    status: "added" | "modified" | "deleted";
+    additions: number;
+    deletions: number;
+    changeType: string;
+  }[];
+}
+
+type LoadedResult =
+  | { kind: "persisted"; data: PersistedReport }
+  | { kind: "error"; error: { kind: string; message: string } };
 
 export default function LiveReportPage() {
   const router = useRouter();
-  const [result] = useState<LoadedResult>(() => {
-    // Only runs on client during initial render
-    return typeof window !== "undefined" ? loadAnalysisResult() : ({ error: { kind: "missing" as const, message: "Loading..." } } as LoadedResult);
+  const [result, setResult] = useState<LoadedResult>({
+    kind: "error",
+    error: { kind: "missing", message: "Loading..." },
   });
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    let cancelled = false;
+    const controller = new AbortController();
+
+    (async () => {
+      const prUrl = sessionStorage.getItem("prism_analysis_prUrl");
+      const repo = sessionStorage.getItem("prism_analysis_repo");
+      const prNumber = sessionStorage.getItem("prism_analysis_prNumber");
+      const headSha = sessionStorage.getItem("prism_analysis_headSha");
+
+      if ((prUrl || (repo && prNumber)) && headSha) {
+        try {
+          const params = new URLSearchParams();
+          if (prUrl) params.set("prUrl", prUrl);
+          if (repo) params.set("repo", repo);
+          if (prNumber) params.set("prNumber", prNumber);
+          if (headSha) params.set("headSha", headSha);
+
+          const res = await fetch(`/api/reports/by-pr?${params.toString()}`, {
+            signal: controller.signal,
+          });
+          if (cancelled) return;
+
+          if (res.ok) {
+            const data = (await res.json()) as PersistedReport;
+            if (!cancelled) {
+              setResult({ kind: "persisted", data });
+              return;
+            }
+          }
+        } catch {
+          // Fall through to error state
+        }
+      }
+
+      if (!cancelled) {
+        setResult({
+          kind: "error",
+          error: { kind: "missing", message: "No analysis result found. Run an analysis first." },
+        });
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, []);
   const [selectedNode, setSelectedNode] = useState<ReportNode | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
 
   const nodesById = useMemo(() => {
-    if ("result" in result && result.result) {
-      return new Map<string, ReportNode>(result.result.nodes.map((n: ReportNode) => [n.id, n]));
+    if (result.kind === "persisted" && result.data.nodes) {
+      return new Map<string, ReportNode>(result.data.nodes.map((n: ReportNode) => [n.id, n]));
     }
     return new Map<string, ReportNode>();
   }, [result]);
@@ -46,9 +124,14 @@ export default function LiveReportPage() {
     router.push(`/analyze?pr=${encoded}`);
   };
 
+  // Extract result data based on kind
+  const hasResult = result.kind === "persisted";
+
+  const errorKind = result.kind === "error" ? result.error : null;
+
   // Missing / invalid result state
-  if (!result || "error" in result) {
-    const message = "error" in result ? result.error?.message ?? "Unable to load report." : "Loading...";
+  if (!hasResult || errorKind) {
+    const message = errorKind?.message ?? "Unable to load report.";
     return (
       <div className="flex flex-col min-h-screen bg-[var(--background)]">
         <main className="flex flex-1 items-center justify-center px-6">
@@ -83,10 +166,23 @@ export default function LiveReportPage() {
     );
   }
 
-  const data = result.result;
+  // Unified data access — persisted only
+  const data = result.data;
+  const title = data.title;
+  const prUrl = data.prUrl;
+  const summary = data.summary;
+  const nodes = data.nodes;
+  const edges = data.edges;
+  const findings = data.findings;
+  const qaItems = data.qaItems;
+  const affectedFiles = data.affectedFiles;
+  const headSha = data.headSha;
+  const analyzedAt = data.analyzedAt;
+  const provider = data.provider;
+  const model = data.model;
+  const isPersisted = true;
 
-  // Extract repo/pr info from prUrl for the header
-  const prUrlParts = data.prUrl.match(/github\.com\/([\w.-]+\/[\w.-]+)\/pull\/(\d+)/);
+  const prUrlParts = prUrl.match(/github\.com\/([\w.-]+\/[\w.-]+)\/pull\/(\d+)/);
   const repo = prUrlParts ? prUrlParts[1] : "unknown/repo";
   const prNumber = prUrlParts ? prUrlParts[2] : "?";
 
@@ -102,7 +198,7 @@ export default function LiveReportPage() {
                   {repo}
                 </h1>
                 <a
-                  href={data.prUrl}
+                  href={prUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1 rounded-lg border border-[var(--border)] px-2.5 py-1 text-xs font-medium text-[var(--accent-cyan)] transition-colors hover:bg-[var(--surface-elevated)]"
@@ -111,27 +207,32 @@ export default function LiveReportPage() {
                   <ExternalLink aria-hidden="true" className="h-3 w-3" />
                 </a>
                 <span className="inline-flex items-center rounded-full bg-[var(--accent-purple)]/20 px-2.5 py-0.5 text-xs font-medium text-[var(--accent-purple)]">
-                  Live analysis
+                  {isPersisted ? "Saved report" : "Live analysis"}
                 </span>
               </div>
               <h2 className="text-base font-medium text-[var(--text-primary)]">
-                {data.title}
+                {title}
               </h2>
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[var(--text-muted)]">
-                {data.metadata.headSha && (
-                  <span>head: {data.metadata.headSha.slice(0, 7)}</span>
+                {headSha && (
+                  <span>head: {headSha.slice(0, 7)}</span>
                 )}
-                {data.metadata.analyzedAt && (
+                {analyzedAt && (
                   <span>
                     analyzed:{" "}
-                    {new Date(data.metadata.analyzedAt).toLocaleString()}
+                    {new Date(analyzedAt).toLocaleString()}
+                  </span>
+                )}
+                {provider && model && (
+                  <span>
+                    model: {provider}/{model}
                   </span>
                 )}
               </div>
             </div>
 
             {/* Report actions */}
-            <ReportActions result={data} onAnalyzeAgain={handleAnalyzeAgain} />
+            <ReportActions result={{ title, prUrl } as any} onAnalyzeAgain={handleAnalyzeAgain} />
           </div>
         </div>
       </header>
@@ -142,11 +243,10 @@ export default function LiveReportPage() {
           {/* Desktop: graph (8 cols) + summary/findings (4 cols) */}
           {/* Mobile: summary first, then graph */}
           <div className="grid gap-6 md:grid-cols-12">
-            {/* Graph — mobile: after summary; desktop: left 8 cols */}
             <div className="order-2 md:order-1 md:col-span-8">
               <ImpactGraph
-                nodes={data.nodes}
-                edges={data.edges}
+                nodes={nodes}
+                edges={edges}
                 selectedNodeId={selectedNode?.id}
                 onNodeSelect={handleNodeSelect}
               />
@@ -154,9 +254,9 @@ export default function LiveReportPage() {
 
             {/* Summary + findings — mobile: first; desktop: right 4 cols */}
             <div className="order-1 md:order-2 md:col-span-4 flex flex-col gap-4">
-              <ChangeSummaryCard summary={data.summary} />
+              <ChangeSummaryCard summary={summary} />
               <ImpactFindings
-                findings={data.findings}
+                findings={findings}
                 nodesById={nodesById}
               />
             </div>
@@ -168,10 +268,10 @@ export default function LiveReportPage() {
           {/* QA checklist + affected files */}
           {/* Desktop: equal-width; Mobile: stacked in spec order */}
           <div className="grid gap-6 md:grid-cols-2">
-            <QAChecklist items={data.qaItems} />
+            <QAChecklist items={qaItems} />
 
             {/* Affected files */}
-            <AffectedFiles files={data.affectedFiles} />
+            <AffectedFiles files={affectedFiles} />
           </div>
         </div>
       </main>

@@ -4,7 +4,6 @@ import React from "react";
 import { cn } from "@/lib/utils";
 import { CheckCircle2, Loader2, AlertCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { ANALYSIS_RESULT_KEY } from "@/lib/analysis/constants";
 import type { AnalysisSnapshot } from "@/types/analysis";
 
 const STAGE_MESSAGES: Record<string, string> = {
@@ -68,23 +67,11 @@ export function AnalysisProgress({
     if (state.type !== "success") return;
 
     const timer = setTimeout(() => {
-      const stored = sessionStorage.getItem(ANALYSIS_RESULT_KEY);
-      if (stored) {
-        try {
-          const parsed = JSON.parse(stored);
-          if (parsed?.metadata?.source === "mock") {
-            router.push(`/report/demo?pr=${encodeURIComponent(prUrl)}`);
-            return;
-          }
-        } catch {
-          // fall through to live path on parse error
-        }
-      }
       router.push("/report");
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [state.type, prUrl, router]);
+  }, [state.type, router]);
 
   // Compute progress from completed stages
   const progressPercent = Math.round(
