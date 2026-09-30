@@ -24,7 +24,7 @@ export function AppHeader() {
   const { data: session, status } = useSession();
   const isLoading = status === "loading";
 
-  if (pathname === "/") return null;
+  if (pathname === "/" || pathname === "/credentials") return null;
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-[#273449] bg-[#090D18]/95 backdrop-blur">

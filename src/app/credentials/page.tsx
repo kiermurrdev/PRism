@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef } from "react";
 import { authFetch } from "@/lib/auth-fetch";
 import "./credentials.css";
+import SiteNav from "@/components/landing/SiteNav";
+import ReferenceField from "@/components/landing/ReferenceField";
 
 type Credential = {
   id: string;
@@ -201,401 +203,234 @@ export default function CredentialsPage() {
 
   return (
     <div className="lp">
-      <div id="field">
-        <div className="bloom" />
-      </div>
+      <ReferenceField />
       <div id="page">
-        {/* Nav */}
-        <nav className="nav is-scrolled">
-          <div className="wrap nav-in">
-            <a href="/" className="logo">
-              <img
-                src="/logo.svg"
-                alt="PRism"
-                className="logo-mark"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = "none";
-                }}
-              />
-              <span className="logo-word">PRism</span>
-            </a>
-            <div className="nav-right">
-              <a href="/" className="nav-link">Home</a>
-              <a href="/dashboard" className="nav-link">Dashboard</a>
-              <a href="/credentials" className="nav-link is-active">Connections</a>
-            </div>
+        <SiteNav />
+
+        <main id="top">
+          <div className="wrap hero">
+            <h1 className="hero-h1 rise" data-r="1">
+              <span className="l">Manage your AI credentials.</span>
+            </h1>
+
+            <p className="hero-sub rise" data-r="2">
+              Add API keys for OpenAI, Anthropic, Google, OpenRouter, or custom endpoints.
+              Test connections, update labels, or remove credentials anytime.
+            </p>
           </div>
-        </nav>
-        <div className="nav-spacer" />
 
-        {/* Header */}
-        <section className="section">
-          <div className="wrap">
-            <div className="s-head">
-              <h1 className="s-title">Connections</h1>
-              <p className="s-note">
-                Manage your AI provider connections. Keys are encrypted at rest and never exposed.
-              </p>
-            </div>
-
+          <section className="wrap section">
             {/* Messages */}
             {error && (
-              <div className="err" style={{ maxWidth: "600px", margin: "0 auto 16px", textAlign: "center" }}>
-                {error}
+              <div className="glass-card p-4 mb-6 border border-[#EF4444]/30">
+                <p className="text-[#EF4444] text-sm">{error}</p>
               </div>
             )}
             {success && (
-              <div className="notice" style={{ maxWidth: "600px", margin: "0 auto 16px", textAlign: "center", color: "var(--accent-cyan)" }}>
-                {success}
+              <div className="glass-card p-4 mb-6 border border-[#22D3EE]/30">
+                <p className="text-[#22D3EE] text-sm">{success}</p>
               </div>
             )}
 
-            {/* Add Credential Button / Form */}
-            <div style={{ display: "flex", justifyContent: "center", marginBottom: "32px" }}>
-              {!showForm ? (
-                <button
-                  onClick={() => setShowForm(true)}
-                  className="nav-primary"
-                  style={{ padding: "12px 24px", fontSize: "14px" }}
-                >
-                  + Add Connection
-                </button>
-              ) : (
-                <div
-                  ref={formRef}
-                  className="glass"
-                  style={{
-                    maxWidth: "600px",
-                    width: "100%",
-                    padding: "20px 24px",
-                    borderRadius: "var(--radius)",
-                  }}
-                >
-                  <form onSubmit={handleCreate}>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-                      {/* Provider */}
-                      <div>
-                        <label className="sr-only">Provider</label>
-                        <select
-                          value={provider}
-                          onChange={(e) => setProvider(e.target.value)}
-                          required
-                          style={{
-                            width: "100%",
-                            padding: "8px 10px",
-                            background: "var(--glass-thin)",
-                            border: "1px solid var(--glass-line)",
-                            borderRadius: "8px",
-                            color: "var(--text-primary)",
-                            fontSize: "13.5px",
-                            fontFamily: "inherit",
-                            outline: "none",
-                          }}
-                        >
-                          <option value="openai">OpenAI</option>
-                          <option value="anthropic">Anthropic</option>
-                          <option value="google">Google (Gemini)</option>
-                          <option value="openrouter">OpenRouter</option>
-                          <option value="azure">Azure OpenAI</option>
-                        </select>
-                      </div>
-
-                      {/* API Key */}
-                      <div>
-                        <label className="sr-only">API Key</label>
-                        <input
-                          type="password"
-                          value={apiKey}
-                          onChange={(e) => setApiKey(e.target.value)}
-                          required
-                          placeholder="sk-..."
-                          style={{
-                            width: "100%",
-                            padding: "8px 10px",
-                            background: "var(--glass-thin)",
-                            border: "1px solid var(--glass-line)",
-                            borderRadius: "8px",
-                            color: "var(--text-primary)",
-                            fontSize: "13.5px",
-                            fontFamily: "var(--font-mono)",
-                            outline: "none",
-                          }}
-                        />
-                      </div>
-
-                      {/* Label */}
-                      <div>
-                        <label className="sr-only">Label</label>
-                        <input
-                          type="text"
-                          value={label}
-                          onChange={(e) => setLabel(e.target.value)}
-                          placeholder="e.g. Production"
-                          style={{
-                            width: "100%",
-                            padding: "8px 10px",
-                            background: "var(--glass-thin)",
-                            border: "1px solid var(--glass-line)",
-                            borderRadius: "8px",
-                            color: "var(--text-primary)",
-                            fontSize: "13.5px",
-                            outline: "none",
-                          }}
-                        />
-                      </div>
-
-                      {/* Model */}
-                      <div>
-                        <label className="sr-only">Default Model</label>
-                        <input
-                          type="text"
-                          value={model}
-                          onChange={(e) => setModel(e.target.value)}
-                          placeholder="e.g. gpt-4o"
-                          style={{
-                            width: "100%",
-                            padding: "8px 10px",
-                            background: "var(--glass-thin)",
-                            border: "1px solid var(--glass-line)",
-                            borderRadius: "8px",
-                            color: "var(--text-primary)",
-                            fontSize: "13.5px",
-                            fontFamily: "var(--font-mono)",
-                            outline: "none",
-                          }}
-                        />
-                      </div>
-                    </div>
-
-                    <div style={{ marginTop: "14px", display: "flex", justifyContent: "flex-end", gap: "8px" }}>
-                      <button
-                        type="button"
-                        onClick={() => setShowForm(false)}
-                        className="nav-link"
-                        style={{ padding: "8px 14px" }}
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="submit"
-                        disabled={saving}
-                        className="cta"
-                        style={{ padding: "8px 18px", fontSize: "13.5px" }}
-                      >
-                        {saving ? "Creating..." : "Create"}
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              )}
-            </div>
-
-            {/* Credentials List */}
-            {loading ? (
-              <div style={{ textAlign: "center", color: "var(--ink-faint)", padding: "40px 0" }}>
-                Loading connections...
-              </div>
-            ) : credentials.length === 0 ? (
-              <div
-                className="panel"
-                style={{
-                  textAlign: "center",
-                  padding: "40px 24px",
-                  maxWidth: "480px",
-                  margin: "0 auto",
-                }}
+            {/* Add credential button */}
+            {!showForm && (
+              <button
+                className="glass-btn credentials-btn mb-6"
+                onClick={() => setShowForm(true)}
               >
-                <p style={{ color: "var(--text-muted)", marginBottom: "4px" }}>
-                  No connections yet
-                </p>
-                <p style={{ color: "var(--ink-faint)", fontSize: "13px" }}>
-                  Add your first AI provider connection to get started
-                </p>
+                Add credential
+              </button>
+            )}
+
+            {/* Add form */}
+            {showForm && (
+              <div ref={formRef} className="glass-card p-6 mb-6">
+                <h2 className="text-lg font-semibold mb-4">Add new credential</h2>
+                <form onSubmit={handleCreate} className="space-y-4">
+                  <div>
+                    <label className="block text-sm text-[#94A3B8] mb-1">Provider</label>
+                    <select
+                      value={provider}
+                      onChange={(e) => setProvider(e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border border-[#273449] bg-[#111827]/80 text-[#F8FAFC] text-sm"
+                    >
+                      <option value="openai">OpenAI</option>
+                      <option value="anthropic">Anthropic</option>
+                      <option value="google">Google (Gemini)</option>
+                      <option value="openrouter">OpenRouter</option>
+                      <option value="azure">Azure OpenAI</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-[#94A3B8] mb-1">API Key</label>
+                    <input
+                      type="password"
+                      value={apiKey}
+                      onChange={(e) => setApiKey(e.target.value)}
+                      placeholder="sk-..."
+                      required
+                      className="w-full px-3 py-2 rounded-lg border border-[#273449] bg-[#111827]/80 text-[#F8FAFC] text-sm font-mono"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm text-[#94A3B8] mb-1">Label (optional)</label>
+                      <input
+                        type="text"
+                        value={label}
+                        onChange={(e) => setLabel(e.target.value)}
+                        placeholder="e.g. Production"
+                        className="w-full px-3 py-2 rounded-lg border border-[#273449] bg-[#111827]/80 text-[#F8FAFC] text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-[#94A3B8] mb-1">Model (optional)</label>
+                      <input
+                        type="text"
+                        value={model}
+                        onChange={(e) => setModel(e.target.value)}
+                        placeholder="e.g. gpt-4o"
+                        className="w-full px-3 py-2 rounded-lg border border-[#273449] bg-[#111827]/80 text-[#F8FAFC] text-sm font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 pt-2">
+                    <button type="submit" className="glass-btn credentials-btn" disabled={saving || !apiKey.trim()}>
+                      {saving ? "Saving..." : "Save credential"}
+                    </button>
+                    <button
+                      type="button"
+                      className="glass-btn credentials-btn"
+                      onClick={() => {
+                        setShowForm(false);
+                        setApiKey("");
+                        setLabel("");
+                        setModel("");
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
               </div>
+            )}
+
+            {/* Credentials list */}
+            {loading ? (
+              <p className="text-[#94A3B8] text-sm">Loading...</p>
+            ) : credentials.length === 0 ? (
+              <p className="text-[#94A3B8] text-sm">No credentials added yet.</p>
             ) : (
-              <div style={{ maxWidth: "720px", margin: "0 auto", display: "flex", flexDirection: "column", gap: "8px" }}>
-                {credentials.map((cred) => (
-                  <div
-                    key={cred.id}
-                    className="panel"
-                    style={{
-                      padding: "14px 18px",
-                      borderRadius: "var(--radius)",
-                    }}
-                  >
-                    {editingId === cred.id ? (
-                      /* Edit Mode */
-                      <div>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "12px" }}>
-                          <input
-                            type="text"
-                            value={editLabel}
-                            onChange={(e) => setEditLabel(e.target.value)}
-                            placeholder="Label"
-                            style={{
-                              padding: "8px 10px",
-                              background: "var(--glass-thin)",
-                              border: "1px solid var(--glass-line)",
-                              borderRadius: "8px",
-                              color: "var(--text-primary)",
-                              fontSize: "13.5px",
-                              outline: "none",
-                            }}
-                          />
-                          <input
-                            type="text"
-                            value={editModel}
-                            onChange={(e) => setEditModel(e.target.value)}
-                            placeholder="Default model"
-                            style={{
-                              padding: "8px 10px",
-                              background: "var(--glass-thin)",
-                              border: "1px solid var(--glass-line)",
-                              borderRadius: "8px",
-                              color: "var(--text-primary)",
-                              fontSize: "13.5px",
-                              fontFamily: "var(--font-mono)",
-                              outline: "none",
-                            }}
-                          />
-                        </div>
-                        <div style={{ display: "flex", gap: "8px" }}>
-                          <button
-                            onClick={() => handleUpdate(cred.id)}
-                            disabled={savingEdit}
-                            className="cta"
-                            style={{ padding: "6px 14px", fontSize: "12.5px" }}
-                          >
-                            {savingEdit ? "Saving..." : "Save"}
-                          </button>
-                          <button
-                            onClick={cancelEditing}
-                            className="nav-link"
-                            style={{ padding: "6px 12px" }}
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      /* View Mode */
-                      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "16px" }}>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
-                            <span style={{ fontSize: "14px" }}>{providerIcon(cred.provider)}</span>
-                            <span style={{ fontWeight: 500, fontSize: "14.5px" }}>
-                              {cred.label || `${cred.provider}`}
+              <div className="space-y-4">
+                {credentials.map((c) => {
+                  const result = testResults[c.id];
+                  const isEditing = editingId === c.id;
+
+                  return (
+                    <div key={c.id} className="glass-card p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="inline-flex items-center rounded-full bg-[#8B5CF6]/20 text-[#8B5CF6] text-xs px-2 py-0.5 font-medium">
+                              {providerIcon(c.provider)} {c.provider}
                             </span>
-                            <span
-                              style={{
-                                fontSize: "10px",
-                                padding: "2px 7px",
-                                borderRadius: "100px",
-                                background: "var(--glass-thin)",
-                                border: "1px solid var(--glass-line)",
-                                color: "var(--text-muted)",
-                                fontFamily: "var(--font-mono)",
-                              }}
-                            >
-                              {cred.provider}
-                            </span>
-                          </div>
-                          <div style={{ display: "flex", alignItems: "center", gap: "14px", fontSize: "12px", color: "var(--ink-faint)", flexWrap: "wrap" }}>
-                            <span className="mono">••••{cred.maskedSuffix}</span>
-                            {cred.model && (
-                              <span className="mono">
-                                {cred.model}
-                              </span>
+                            {c.label && (
+                              <span className="text-[#F8FAFC] text-sm">{c.label}</span>
                             )}
-                            <span>
-                              {new Date(cred.createdAt).toLocaleDateString()}
-                            </span>
                           </div>
-                          {/* Test Result */}
-                          {testResults[cred.id] && (
-                            <div
-                              style={{
-                                marginTop: "6px",
-                                fontSize: "11.5px",
-                                padding: "4px 8px",
-                                borderRadius: "6px",
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: "4px",
-                                background: testResults[cred.id].success
-                                  ? "color-mix(in srgb, var(--accent-cyan) 10%, transparent)"
-                                  : "color-mix(in srgb, var(--status-possible) 12%, transparent)",
-                                color: testResults[cred.id].success
-                                  ? "var(--accent-cyan)"
-                                  : "var(--status-possible)",
-                              }}
-                            >
-                              {testResults[cred.id].success ? "✓" : "✗"}
-                              {testResults[cred.id].message}
-                              {testResults[cred.id].responseTimeMs && (
-                                <span style={{ opacity: 0.7 }}>
-                                  ({testResults[cred.id].responseTimeMs}ms)
-                                </span>
-                              )}
-                            </div>
+                          <p className="text-[#94A3B8] text-xs font-mono">
+                            {c.maskedSuffix}
+                          </p>
+                          {c.model && (
+                            <p className="text-[#94A3B8] text-xs mt-1">
+                              Model: {c.model}
+                            </p>
+                          )}
+                          {result && (
+                            <p className={`text-xs mt-1 ${result.success ? "text-[#22D3EE]" : "text-[#EF4444]"}`}>
+                              {result.message}
+                              {result.responseTimeMs != null && ` (${result.responseTimeMs}ms)`}
+                            </p>
                           )}
                         </div>
-                        <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
-                          <button
-                            onClick={() => handleTest(cred.id)}
-                            disabled={testingId === cred.id}
-                            style={{
-                              padding: "5px 10px",
-                              fontSize: "12px",
-                              borderRadius: "6px",
-                              border: "1px solid var(--glass-line)",
-                              background: "var(--glass-thin)",
-                              color: "var(--text-muted)",
-                              cursor: "pointer",
-                              transition: "all 0.2s",
-                            }}
-                          >
-                            {testingId === cred.id ? "..." : "Test"}
-                          </button>
-                          <button
-                            onClick={() => startEditing(cred)}
-                            style={{
-                              padding: "5px 10px",
-                              fontSize: "12px",
-                              borderRadius: "6px",
-                              border: "1px solid var(--glass-line)",
-                              background: "var(--glass-thin)",
-                              color: "var(--text-muted)",
-                              cursor: "pointer",
-                              transition: "all 0.2s",
-                            }}
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleDelete(cred.id)}
-                            style={{
-                              padding: "5px 10px",
-                              fontSize: "12px",
-                              borderRadius: "6px",
-                              border: "1px solid color-mix(in srgb, var(--status-possible) 30%, transparent)",
-                              background: "color-mix(in srgb, var(--status-possible) 8%, transparent)",
-                              color: "var(--status-possible)",
-                              cursor: "pointer",
-                              transition: "all 0.2s",
-                            }}
-                          >
-                            Remove
-                          </button>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          {!isEditing && (
+                            <>
+                              <button
+                                className="glass-btn credentials-btn text-xs"
+                                onClick={() => handleTest(c.id)}
+                                disabled={testingId === c.id}
+                              >
+                                {testingId === c.id ? "Testing..." : "Test"}
+                              </button>
+                              <button
+                                className="glass-btn credentials-btn text-xs"
+                                onClick={() => startEditing(c)}
+                              >
+                                Edit
+                              </button>
+                              <button
+                                className="glass-btn credentials-btn credentials-btn-remove text-xs"
+                                onClick={() => handleDelete(c.id)}
+                              >
+                                Remove
+                              </button>
+                            </>
+                          )}
                         </div>
                       </div>
-                    )}
-                  </div>
-                ))}
+
+                      {/* Edit form */}
+                      {isEditing && (
+                        <div className="mt-4 pt-4 border-t border-[#273449] space-y-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-xs text-[#94A3B8] mb-1">Label</label>
+                              <input
+                                type="text"
+                                value={editLabel}
+                                onChange={(e) => setEditLabel(e.target.value)}
+                                className="w-full px-3 py-2 rounded-lg border border-[#273449] bg-[#111827]/80 text-[#F8FAFC] text-sm"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-[#94A3B8] mb-1">Model</label>
+                              <input
+                                type="text"
+                                value={editModel}
+                                onChange={(e) => setEditModel(e.target.value)}
+                                className="w-full px-3 py-2 rounded-lg border border-[#273449] bg-[#111827]/80 text-[#F8FAFC] text-sm font-mono"
+                              />
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              className="glass-btn credentials-btn text-xs"
+                              onClick={() => handleUpdate(c.id)}
+                              disabled={savingEdit}
+                            >
+                              {savingEdit ? "Saving..." : "Save"}
+                            </button>
+                            <button
+                              className="glass-btn credentials-btn text-xs"
+                              onClick={cancelEditing}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
-          </div>
-        </section>
+          </section>
+        </main>
       </div>
     </div>
   );

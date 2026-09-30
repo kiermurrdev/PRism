@@ -5,7 +5,9 @@ export async function authFetch(input: RequestInfo | URL, init?: RequestInit): P
   });
 
   if (res.status === 401) {
-    window.location.href = "/login";
+    const signInUrl = new URL("/auth/signin", window.location.href);
+    signInUrl.searchParams.set("callbackUrl", window.location.pathname);
+    window.location.href = signInUrl.toString();
   }
 
   return res;
